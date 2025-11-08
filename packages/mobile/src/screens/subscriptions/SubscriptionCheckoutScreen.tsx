@@ -11,19 +11,35 @@ import {
 import {
   useAuthStore,
   formatCurrency,
-  createOrder,
-  clearCart,
+  createSubscription,
   UserAddress,
-  OrderType,
-  OrderStatus,
-  CartItem,
+  SubscriptionFrequency,
+  SubscriptionStatus,
+  SubscriptionItem,
   dateToTimestamp,
+  formatDate,
 } from '@ecommerce/shared';
 
 type PaymentMethod = 'cod' | 'online';
 
-export const CheckoutScreen = ({ route, navigation }: any) => {
-  const { cartItems, total } = route.params;
+interface CheckoutItem {
+  productId: string;
+  productName: string;
+  quantity: number;
+  price: number;
+}
+
+export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
+  const {
+    items,
+    frequency,
+    startDate,
+    endDate,
+    totalDeliveries,
+    perDeliveryTotal,
+    totalAmount,
+  } = route.params;
+
   const { user } = useAuthStore();
   const [selectedAddress, setSelectedAddress] = useState<UserAddress | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod');
@@ -45,10 +61,10 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
         [
           {
             text: 'Add Address',
-            onPress: () => navigation.navigate('ProfileTab', {
-              screen: 'AddAddress',
-              params: { returnTo: 'Checkout' }
-            }),
+            onPress: () =>
+              navigation.navigate('ProfileTab', {
+                screen: 'AddAddress',
+              }),
           },
           { text: 'Cancel', style: 'cancel' },
         ]
@@ -64,84 +80,73 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
     });
   };
 
-  const handlePlaceOrder = async () => {
-    if (!user) {
-      Alert.alert('Error', 'Please login to place an order');
-      return;
-    }
-
-    if (!selectedAddress) {
-      Alert.alert('Error', 'Please select a delivery address');
-      handleSelectAddress();
-      return;
-    }
-
-    setLoading(true);
-    try {
-      // Prepare order items
-      const orderItems = cartItems.map((item: CartItem) => ({
-        productId: item.productId,
-        quantity: item.quantity,
-        price: item.product?.price || 0,
-      }));
-
-      // Calculate delivery date (next day)
-      const deliveryDate = new Date();
-      deliveryDate.setDate(deliveryDate.getDate() + 1);
-      deliveryDate.setHours(7, 0, 0, 0); // 7 AM delivery
-
-      // Create order
-      const orderId = await createOrder({
-        userId: user.id,
-        type: OrderType.ONE_TIME,
-        items: orderItems,
-        totalAmount: total,
-        deliveryAddress: selectedAddress,
-        status: OrderStatus.PENDING,
-        scheduledDeliveryDate: dateToTimestamp(deliveryDate),
-      });
-
-      // Clear cart after successful order
-      await clearCart(user.id);
-
-      // Show success based on payment method
-      if (paymentMethod === 'cod') {
-        Alert.alert(
-          'Order Placed Successfully! 🎉',
-          `Your order will be delivered tomorrow at 7 AM.\n\nOrder ID: ${orderId.slice(0, 8)}\nPayment: Cash on Delivery`,
-          [
-            {
-              text: 'View Orders',
-              onPress: () => navigation.navigate('ProfileTab', {
-                screen: 'OrderHistory',
-              }),
-            },
-            {
-              text: 'Continue Shopping',
-              onPress: () => navigation.navigate('HomeTab'),
-            },
-          ]
-        );
-      } else {
-        // For online payment (future implementation)
-        Alert.alert(
-          'Proceeding to Payment',
-          'Online payment integration coming soon! For now, order is placed as COD.',
-          [
-            {
-              text: 'OK',
-              onPress: () => navigation.navigate('HomeTab'),
-            },
-          ]
-        );
-      }
-    } catch (error) {
-      console.error('Error placing order:', error);
-      Alert.alert('Error', 'Failed to place order. Please try again.');
-    } finally {
-      setLoading(false);
+  const getFrequencyText = (freq: SubscriptionFrequency) => {
+    switch (freq) {
+      case SubscriptionFrequency.DAILY:
+        return 'Daily';
+      case SubscriptionFrequency.ALTERNATE_DAYS:
+        return 'Alternate Days';
+      case SubscriptionFrequency.WEEKLY:
+        return 'Weekly';
+      default:
+        return freq;
     }
   };
+
+  const handleCreateSubscription = async () => {
+  if (!user) {
+    Alert.alert('Error', 'Please login to create subscription');
+    return;
+  }
+
+  if (!selectedAddress) {
+    Alert.alert('Error', 'Please select a delivery address');
+    handleSelectAddress();
+    return;
+  }
+
+  setLoading(true);
+  try {
+    const subscriptionItems: SubscriptionItem[] = items.map((item: CheckoutItem) => ({
+      productId: item.productId,
+      quantity: item.quantity,
+    }));
+
+    await createSubscription({
+      userId: user.id,
+      items: subscriptionItems,
+      frequency,
+      status: SubscriptionStatus.ACTIVE,
+      deliveryAddress: selectedAddress, // Pass full address object
+      startDate: dateToTimestamp(startDate),
+      endDate: dateToTimestamp(endDate),
+    });
+
+    Alert.alert(
+      'Subscription Created! 🎉',
+      `Your subscription is now active!\n\n📦 Deliveries: ${totalDeliveries}\n💰 Total Paid: ${formatCurrency(totalAmount)}\n📅 First delivery: ${formatDate(dateToTimestamp(startDate))}`,
+      [
+        {
+          text: 'View Subscriptions',
+          onPress: () => {
+            navigation.navigate('SubscriptionsTab', {
+              screen: 'SubscriptionsList',
+            });
+          },
+        },
+        {
+          text: 'Continue Shopping',
+          onPress: () => navigation.navigate('HomeTab'),
+        },
+      ]
+    );
+  } catch (error: any) {
+    console.error('Error creating subscription:', error);
+    Alert.alert('Error', error.message || 'Failed to create subscription');
+  } finally {
+    setLoading(false);
+  }
+};
 
   if (!user) {
     return (
@@ -180,7 +185,8 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
                 {selectedAddress.street}
               </Text>
               <Text style={styles.addressText}>
-                {selectedAddress.city}, {selectedAddress.state} - {selectedAddress.pincode}
+                {selectedAddress.city}, {selectedAddress.state} -{' '}
+                {selectedAddress.pincode}
               </Text>
               {selectedAddress.landmark && (
                 <Text style={styles.landmarkText}>
@@ -201,7 +207,7 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
         {/* Payment Method Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>💳 Payment Method</Text>
-          
+
           {/* Cash on Delivery */}
           <TouchableOpacity
             style={[
@@ -217,7 +223,7 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
               <View style={styles.paymentOptionDetails}>
                 <Text style={styles.paymentOptionTitle}>Cash on Delivery</Text>
                 <Text style={styles.paymentOptionSubtitle}>
-                  Pay when you receive your order
+                  Pay upfront amount in cash
                 </Text>
               </View>
             </View>
@@ -247,41 +253,62 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
           </TouchableOpacity>
         </View>
 
-        {/* Order Items Section */}
+        {/* Subscription Details */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📦 Order Items ({cartItems.length})</Text>
-          {cartItems.map((item: CartItem, index: number) => (
+          <Text style={styles.sectionTitle}>📋 Subscription Details</Text>
+          <View style={styles.detailCard}>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Frequency</Text>
+              <Text style={styles.detailValue}>{getFrequencyText(frequency)}</Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Start Date</Text>
+              <Text style={styles.detailValue}>
+                {formatDate(dateToTimestamp(startDate))}
+              </Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>End Date</Text>
+              <Text style={styles.detailValue}>
+                {formatDate(dateToTimestamp(endDate))}
+              </Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Total Deliveries</Text>
+              <Text style={styles.detailValue}>{totalDeliveries}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Subscription Items */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>📦 Items ({items.length})</Text>
+          {items.map((item: CheckoutItem, index: number) => (
             <View key={index} style={styles.orderItem}>
               <View style={styles.orderItemDetails}>
-                <Text style={styles.orderItemName}>{item.product?.name}</Text>
+                <Text style={styles.orderItemName}>{item.productName}</Text>
                 <Text style={styles.orderItemQuantity}>Qty: {item.quantity}</Text>
               </View>
               <Text style={styles.orderItemPrice}>
-                {formatCurrency((item.product?.price || 0) * item.quantity)}
+                {formatCurrency(item.price * item.quantity)}
               </Text>
             </View>
           ))}
         </View>
 
-        {/* Delivery Info */}
+        {/* Price Summary */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🚚 Delivery Information</Text>
-          <View style={styles.infoCard}>
-            <Text style={styles.infoText}>📅 Estimated Delivery: Tomorrow at 7 AM</Text>
-            <Text style={styles.infoText}>📦 Packaging: Sealed and hygienic</Text>
-            <Text style={styles.infoText}>
-              💰 Payment: {paymentMethod === 'cod' ? 'Cash on Delivery' : 'Online Payment'}
-            </Text>
-          </View>
-        </View>
-
-        {/* Price Breakdown */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>💰 Price Details</Text>
+          <Text style={styles.sectionTitle}>💰 Payment Summary</Text>
           <View style={styles.priceCard}>
             <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>Subtotal</Text>
-              <Text style={styles.priceValue}>{formatCurrency(total)}</Text>
+              <Text style={styles.priceLabel}>Per Delivery</Text>
+              <Text style={styles.priceValue}>
+                {formatCurrency(perDeliveryTotal)}
+              </Text>
+            </View>
+            <View style={styles.priceRow}>
+              <Text style={styles.priceLabel}>Number of Deliveries</Text>
+              <Text style={styles.priceValue}>{totalDeliveries}</Text>
             </View>
             <View style={styles.priceRow}>
               <Text style={styles.priceLabel}>Delivery Charges</Text>
@@ -289,8 +316,13 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
             </View>
             <View style={styles.divider} />
             <View style={styles.priceRow}>
-              <Text style={styles.totalLabel}>Total Amount</Text>
-              <Text style={styles.totalValue}>{formatCurrency(total)}</Text>
+              <Text style={styles.totalLabel}>Total Amount (Upfront)</Text>
+              <Text style={styles.totalValue}>{formatCurrency(totalAmount)}</Text>
+            </View>
+            <View style={styles.paymentNote}>
+              <Text style={styles.paymentNoteText}>
+                💳 Full payment collected in advance
+              </Text>
             </View>
           </View>
         </View>
@@ -298,22 +330,27 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
         <View style={styles.bottomSpacer} />
       </ScrollView>
 
-      {/* Place Order Button */}
+      {/* Create Subscription Button */}
       <View style={styles.footer}>
         <View style={styles.footerInfo}>
           <Text style={styles.footerLabel}>Total</Text>
-          <Text style={styles.footerPrice}>{formatCurrency(total)}</Text>
+          <Text style={styles.footerPrice}>{formatCurrency(totalAmount)}</Text>
         </View>
         <TouchableOpacity
-          style={[styles.placeOrderButton, (!selectedAddress || loading) && styles.buttonDisabled]}
-          onPress={handlePlaceOrder}
+          style={[
+            styles.createButton,
+            (!selectedAddress || loading) && styles.buttonDisabled,
+          ]}
+          onPress={handleCreateSubscription}
           disabled={!selectedAddress || loading}
         >
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.placeOrderText}>
-              {paymentMethod === 'cod' ? 'Place Order (COD)' : 'Proceed to Payment'}
+            <Text style={styles.createButtonText}>
+              {paymentMethod === 'cod'
+                ? `Pay ${formatCurrency(totalAmount)} (COD)`
+                : 'Proceed to Payment'}
             </Text>
           )}
         </TouchableOpacity>
@@ -462,6 +499,25 @@ const styles = StyleSheet.create({
   paymentOptionIcon: {
     fontSize: 28,
   },
+  detailCard: {
+    backgroundColor: '#f9f9f9',
+    padding: 16,
+    borderRadius: 12,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  detailLabel: {
+    fontSize: 14,
+    color: '#666',
+  },
+  detailValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
   orderItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -486,17 +542,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#1a1a1a',
-  },
-  infoCard: {
-    backgroundColor: '#f0f9ff',
-    padding: 16,
-    borderRadius: 12,
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#1e40af',
-    marginBottom: 8,
-    lineHeight: 20,
   },
   priceCard: {
     backgroundColor: '#f9f9f9',
@@ -529,14 +574,25 @@ const styles = StyleSheet.create({
     marginVertical: 12,
   },
   totalLabel: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#1a1a1a',
   },
   totalValue: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#4CAF50',
+  },
+  paymentNote: {
+    backgroundColor: '#e8f5e9',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 12,
+  },
+  paymentNoteText: {
+    fontSize: 12,
+    color: '#2e7d32',
+    textAlign: 'center',
   },
   bottomSpacer: {
     height: 20,
@@ -563,7 +619,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#1a1a1a',
   },
-  placeOrderButton: {
+  createButton: {
     backgroundColor: '#4CAF50',
     height: 56,
     borderRadius: 12,
@@ -580,7 +636,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0,
     elevation: 0,
   },
-  placeOrderText: {
+  createButtonText: {
     color: '#fff',
     fontSize: 18,
     fontWeight: '600',

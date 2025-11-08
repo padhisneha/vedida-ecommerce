@@ -114,9 +114,9 @@ export interface Subscription {
   items: SubscriptionItem[];
   frequency: SubscriptionFrequency;
   status: SubscriptionStatus;
-  deliveryAddressId: string;
+  deliveryAddress: UserAddress; 
   startDate: Timestamp;
-  endDate?: Timestamp; // null means ongoing
+  endDate?: Timestamp;
   pausedUntil?: Timestamp;
   createdAt: Timestamp;
   updatedAt: Timestamp;

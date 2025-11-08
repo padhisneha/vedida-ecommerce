@@ -4,12 +4,12 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { initializeApp } from './src/config/firebase';
 import { useAuthStore } from '@ecommerce/shared';
-import { getFirebaseAuth, getUserById } from '@ecommerce/shared';
+import { getFirebaseAuth } from '@ecommerce/shared';
 import { onAuthStateChanged } from 'firebase/auth';
-
+import { getUserById } from '@ecommerce/shared';
 
 export default function App() {
-  const { setUser, setLoading } = useAuthStore();
+  const { setUser, setLoading, user } = useAuthStore();
 
   useEffect(() => {
     // Initialize Firebase
@@ -29,11 +29,14 @@ export default function App() {
       if (firebaseUser) {
         try {
           // Fetch user from Firestore
-          const user = await getUserById(firebaseUser.uid);
+          const userData = await getUserById(firebaseUser.uid);
 
-          if (user) {
-            console.log('✅ User loaded:', user.id);
-            setUser(user);
+          if (userData) {
+            console.log('✅ User loaded:', userData.id);
+            console.log('Name:', userData.name);
+            console.log('Addresses:', userData.addresses?.length || 0);
+            
+            setUser(userData);
           } else {
             console.log('⚠️ User not found in Firestore');
             setUser(null);
@@ -50,6 +53,17 @@ export default function App() {
 
     return () => unsubscribe();
   }, []);
+
+  // Log user changes for debugging
+  useEffect(() => {
+    if (user) {
+      console.log('User state updated:', {
+        id: user.id,
+        name: user.name,
+        addressCount: user.addresses?.length || 0,
+      });
+    }
+  }, [user]);
 
   return (
     <SafeAreaProvider>

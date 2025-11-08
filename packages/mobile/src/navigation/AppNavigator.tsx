@@ -7,6 +7,7 @@ import { Text } from 'react-native';
 
 // Auth Screens
 import { LoginScreen } from '../screens/auth/LoginScreen';
+import { OnboardingScreen } from '../screens/auth/OnboardingScreen';
 
 // Home Screens
 import { HomeScreen } from '../screens/home/HomeScreen';
@@ -19,9 +20,22 @@ import { CheckoutScreen } from '../screens/checkout/CheckoutScreen';
 // Subscription Screens
 import { SubscriptionsScreen } from '../screens/subscriptions/SubscriptionsScreen';
 import { CreateSubscriptionScreen } from '../screens/subscriptions/CreateSubscriptionScreen';
+import { SubscriptionCheckoutScreen } from '../screens/subscriptions/SubscriptionCheckoutScreen';
+import { SubscriptionDetailScreen } from '../screens/subscriptions/SubscriptionDetailScreen';
+import { PauseSubscriptionScreen } from '../screens/subscriptions/PauseSubscriptionScreen';
 
 // Profile Screens
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
+import { EditProfileScreen } from '../screens/profile/EditProfileScreen';
+
+// Address Screens
+import { AddressListScreen } from '../screens/address/AddressListScreen';
+import { AddEditAddressScreen } from '../screens/address/AddEditAddressScreen';
+import { SelectAddressScreen } from '../screens/address/SelectAddressScreen';
+
+// Order Screens
+import { OrderHistoryScreen } from '../screens/orders/OrderHistoryScreen';
+import { OrderDetailScreen } from '../screens/orders/OrderDetailScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -72,6 +86,16 @@ const CartStack = () => {
           headerTitleStyle: { fontWeight: '600' },
         }}
       />
+      <Stack.Screen
+        name="SelectAddress"
+        component={SelectAddressScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="AddAddress"
+        component={AddEditAddressScreen}
+        options={{ headerShown: false }}
+      />
     </Stack.Navigator>
   );
 };
@@ -95,9 +119,83 @@ const SubscriptionsStack = () => {
           headerTitleStyle: { fontWeight: '600' },
         }}
       />
+      <Stack.Screen
+        name="SubscriptionCheckout"
+        component={SubscriptionCheckoutScreen}
+        options={{
+          title: 'Subscription Checkout',
+          headerStyle: { backgroundColor: '#fff' },
+          headerTintColor: '#4CAF50',
+          headerTitleStyle: { fontWeight: '600' },
+        }}
+      />
+      <Stack.Screen
+        name="SubscriptionDetail"
+        component={SubscriptionDetailScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="PauseSubscription"
+        component={PauseSubscriptionScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="SelectAddress"
+        component={SelectAddressScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="AddAddress"
+        component={AddEditAddressScreen}
+        options={{ headerShown: false }}
+      />
     </Stack.Navigator>
   );
 };
+
+// Profile Stack Navigator
+const ProfileStack = () => {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen
+        name="ProfileMain"
+        component={ProfileScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="EditProfile"
+        component={EditProfileScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="AddressList"
+        component={AddressListScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="AddAddress"
+        component={AddEditAddressScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="EditAddress"
+        component={AddEditAddressScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="OrderHistory"
+        component={OrderHistoryScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="OrderDetail"
+        component={OrderDetailScreen}
+        options={{ headerShown: false }}
+      />
+    </Stack.Navigator>
+  );
+};
+
 
 // Tab Navigator
 const TabNavigator = () => {
@@ -111,8 +209,8 @@ const TabNavigator = () => {
           borderTopWidth: 1,
           borderTopColor: '#e0e0e0',
           paddingTop: 4,
-          paddingBottom: 30, // Increased for Android navigation
-          height: 100, // Increased height
+          paddingBottom: 30,
+          height: 100,
           backgroundColor: '#fff',
         },
         tabBarLabelStyle: {
@@ -151,7 +249,7 @@ const TabNavigator = () => {
       />
       <Tab.Screen
         name="ProfileTab"
-        component={ProfileScreen}
+        component={ProfileStack}
         options={{
           tabBarLabel: 'Profile',
           tabBarIcon: ({ color }) => <TabIcon icon="👤" color={color} />,
@@ -163,17 +261,30 @@ const TabNavigator = () => {
 
 // Root Navigator
 export const AppNavigator = () => {
-  const { isAuthenticated, isLoading } = useAuthStore();
+  const { isAuthenticated, isLoading, user } = useAuthStore();
 
   if (isLoading) {
     return null;
   }
+
+  // Check if user needs onboarding
+  const needsOnboarding = isAuthenticated && user && (!user.name || user.addresses.length === 0);
+
+  console.log('Navigation state:', {
+    isAuthenticated,
+    hasUser: !!user,
+    userName: user?.name,
+    addressCount: user?.addresses?.length || 0,
+    needsOnboarding,
+  });
 
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!isAuthenticated ? (
           <Stack.Screen name="Login" component={LoginScreen} />
+        ) : needsOnboarding ? (
+          <Stack.Screen name="Onboarding" component={OnboardingScreen} />
         ) : (
           <Stack.Screen name="MainApp" component={TabNavigator} />
         )}

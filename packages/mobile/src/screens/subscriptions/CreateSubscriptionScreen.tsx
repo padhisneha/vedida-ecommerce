@@ -163,81 +163,45 @@ export const CreateSubscriptionScreen = ({ navigation }: any) => {
     }
   };
 
-  const handleCreateSubscription = async () => {
-    if (!user) {
-      Alert.alert('Error', 'Please login to create subscription');
-      return;
-    }
+  const handleCreateSubscription = () => {
+  if (!user) {
+    Alert.alert('Error', 'Please login to create subscription');
+    return;
+  }
 
-    if (selectedItems.length === 0) {
-      Alert.alert('Error', 'Please select at least one product');
-      return;
-    }
+  if (selectedItems.length === 0) {
+    Alert.alert('Error', 'Please select at least one product');
+    return;
+  }
 
-    if (!selectedAddress) {
-      Alert.alert('Error', 'Please select a delivery address');
-      return;
-    }
+  const totalDeliveries = calculateTotalDeliveries();
+  const perDeliveryTotal = calculatePerDeliveryTotal();
+  const totalAmount = calculateTotalAmount();
 
-    if (endDate <= startDate) {
-      Alert.alert('Error', 'End date must be after start date');
-      return;
-    }
+  if (totalDeliveries === 0) {
+    Alert.alert('Error', 'Invalid subscription duration');
+    return;
+  }
 
-    const totalAmount = calculateTotalAmount();
-    const deliveries = calculateTotalDeliveries();
+  // Prepare items for checkout
+  const checkoutItems = selectedItems.map((item) => ({
+    productId: item.product.id,
+    productName: item.product.name,
+    quantity: item.quantity,
+    price: item.product.price,
+  }));
 
-    if (deliveries === 0) {
-      Alert.alert('Error', 'Invalid subscription duration');
-      return;
-    }
-
-    Alert.alert(
-      'Confirm Subscription',
-      `📦 Total Deliveries: ${deliveries}\n💰 Total Amount: ${formatCurrency(totalAmount)}\n📅 Start: ${startDate.toLocaleDateString('en-IN')}\n📅 End: ${endDate.toLocaleDateString('en-IN')}\n\n✅ Payment will be collected upfront.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Confirm & Pay',
-          onPress: async () => {
-            setCreating(true);
-            try {
-              const subscriptionItems = selectedItems.map((item) => ({
-                productId: item.product.id,
-                quantity: item.quantity,
-              }));
-
-              await createSubscription({
-                userId: user.id,
-                items: subscriptionItems,
-                frequency,
-                status: SubscriptionStatus.ACTIVE,
-                deliveryAddressId: selectedAddress.id,
-                startDate: dateToTimestamp(startDate),
-                endDate: dateToTimestamp(endDate),
-              });
-
-              Alert.alert(
-                'Subscription Created! 🎉',
-                `Your subscription is now active!\n\n📦 Deliveries: ${deliveries}\n💰 Total Paid: ${formatCurrency(totalAmount)}\n📅 First delivery: ${startDate.toLocaleDateString('en-IN')}`,
-                [
-                  {
-                    text: 'View Subscriptions',
-                    onPress: () => navigation.goBack(),
-                  },
-                ]
-              );
-            } catch (error: any) {
-              console.error('Error creating subscription:', error);
-              Alert.alert('Error', error.message || 'Failed to create subscription');
-            } finally {
-              setCreating(false);
-            }
-          },
-        },
-      ]
-    );
-  };
+  // Navigate to subscription checkout
+  navigation.navigate('SubscriptionCheckout', {
+    items: checkoutItems,
+    frequency,
+    startDate,
+    endDate,
+    totalDeliveries,
+    perDeliveryTotal,
+    totalAmount,
+  });
+};
 
   const frequencies = [
     { value: SubscriptionFrequency.DAILY, label: 'Daily', icon: '📅' },

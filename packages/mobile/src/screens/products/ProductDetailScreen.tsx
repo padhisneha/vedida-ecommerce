@@ -60,10 +60,6 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
 
       Alert.alert('Success', `${quantity} item(s) added to cart!`, [
         { text: 'Continue Shopping', style: 'cancel' },
-        {
-          text: 'View Cart',
-          onPress: () => navigation.navigate('Cart'),
-        },
       ]);
     } catch (error: any) {
       console.error('Error adding to cart:', error);
