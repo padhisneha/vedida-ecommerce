@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "20614295111",
+    "project_id": "vedida-fa741",
+    "storage_bucket": "vedida-fa741.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:20614295111:android:1fcf7ab1dcd9c902f38b62",
+        "android_client_info": {
+          "package_name": "com.vedida.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD0TfJo2tfo8FI3cV8Jg7Y6f74f0rNjm6w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,36 @@
+{
+  "name": "@ecommerce/mobile",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "dev": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf .expo node_modules"
+  },
+  "dependencies": {
+    "@ecommerce/shared": "workspace:*",
+    "@react-native-async-storage/async-storage": "^2.2.0",
+    "@react-navigation/bottom-tabs": "^6.5.11",
+    "@react-navigation/native": "^6.1.9",
+    "@react-navigation/native-stack": "^6.9.17",
+    "expo": "~54.0.22",
+    "expo-firebase-recaptcha": "^2.3.1",
+    "expo-status-bar": "~3.0.8",
+    "firebase": "^10.14.1",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-safe-area-context": "5.6.0",
+    "react-native-screens": "~4.16.0",
+    "react-native-webview": "^13.16.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.0",
+    "@types/react": "~19.1.0",
+    "babel-plugin-module-resolver": "^5.0.2",
+    "typescript": "~5.9.2"
+  }
+}
