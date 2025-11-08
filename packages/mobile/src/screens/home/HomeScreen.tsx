@@ -8,7 +8,7 @@ import {
   Image,
   ActivityIndicator,
 } from 'react-native';
-import { Product, formatCurrency, getInStockProducts } from '@ecommerce/shared';
+import { Product, getInStockProducts, formatCurrency } from '@ecommerce/shared';
 
 export const HomeScreen = ({ navigation }: any) => {
   const [products, setProducts] = useState<Product[]>([]);

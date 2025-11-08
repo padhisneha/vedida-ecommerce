@@ -7,9 +7,8 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-import { useAuthStore } from '@ecommerce/shared';
+import { useAuthStore, getFirebaseAuth } from '@ecommerce/shared';
 import { signOut } from 'firebase/auth';
-import { getFirebaseAuth } from '@ecommerce/shared';
 
 export const ProfileScreen = () => {
   const { user, logout } = useAuthStore();
@@ -35,6 +34,7 @@ export const ProfileScreen = () => {
 
   return (
     <ScrollView style={styles.container}>
+      {/* Added SafeAreaView replacement with manual padding */}
       <View style={styles.header}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>
@@ -48,24 +48,31 @@ export const ProfileScreen = () => {
       <View style={styles.section}>
         <TouchableOpacity style={styles.menuItem}>
           <Text style={styles.menuText}>Edit Profile</Text>
+          <Text style={styles.menuArrow}>›</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem}>
           <Text style={styles.menuText}>My Addresses</Text>
+          <Text style={styles.menuArrow}>›</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem}>
           <Text style={styles.menuText}>Order History</Text>
+          <Text style={styles.menuArrow}>›</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem}>
           <Text style={styles.menuText}>Help & Support</Text>
+          <Text style={styles.menuArrow}>›</Text>
         </TouchableOpacity>
       </View>
 
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <Text style={styles.logoutText}>Logout</Text>
       </TouchableOpacity>
+
+      {/* Bottom spacing for tab bar */}
+      <View style={styles.bottomSpacer} />
     </ScrollView>
   );
 };
@@ -78,6 +85,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#fff',
     padding: 24,
+    paddingTop: 80, // Increased from 24 to avoid status bar
     alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
@@ -114,6 +122,9 @@ const styles = StyleSheet.create({
     borderColor: '#e0e0e0',
   },
   menuItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingVertical: 16,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
@@ -122,6 +133,10 @@ const styles = StyleSheet.create({
   menuText: {
     fontSize: 16,
     color: '#1a1a1a',
+  },
+  menuArrow: {
+    fontSize: 24,
+    color: '#ccc',
   },
   logoutButton: {
     backgroundColor: '#fff',
@@ -137,5 +152,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#ff5252',
+  },
+  bottomSpacer: {
+    height: 100, // Extra space at bottom for tab bar
   },
 });
