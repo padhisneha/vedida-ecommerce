@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import {
   useAuthStore,
-  getUserSubscriptions,
+  getUserSubscriptionsWithProducts,
   Subscription,
   SubscriptionStatus,
   formatCurrency,
@@ -18,11 +18,13 @@ import {
   updateSubscriptionStatus,
 } from '@ecommerce/shared';
 
+type TabType = 'active' | 'closed';
+
 export const SubscriptionsScreen = ({ navigation }: any) => {
   const { user } = useAuthStore();
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<TabType>('active');
 
   useEffect(() => {
     if (user) {
@@ -47,8 +49,9 @@ export const SubscriptionsScreen = ({ navigation }: any) => {
     if (!user) return;
 
     try {
-      const data = await getUserSubscriptions(user.id);
+      const data = await getUserSubscriptionsWithProducts(user.id); // Changed
       setSubscriptions(data);
+      console.log('✅ Loaded subscriptions with products:', data.length);
     } catch (error) {
       console.error('Error loading subscriptions:', error);
       Alert.alert('Error', 'Failed to load subscriptions');
@@ -57,92 +60,38 @@ export const SubscriptionsScreen = ({ navigation }: any) => {
     }
   };
 
-  const handlePauseSubscription = async (subscriptionId: string) => {
-    Alert.alert(
-      'Pause Subscription',
-      'How long do you want to pause?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: '1 Week',
-          onPress: () => pauseSubscription(subscriptionId, 7),
-        },
-        {
-          text: '2 Weeks',
-          onPress: () => pauseSubscription(subscriptionId, 14),
-        },
-        {
-          text: '1 Month',
-          onPress: () => pauseSubscription(subscriptionId, 30),
-        },
-      ]
-    );
-  };
-
-  const pauseSubscription = async (subscriptionId: string, days: number) => {
-    setActionLoading(subscriptionId);
-    try {
-      const pauseUntil = new Date();
-      pauseUntil.setDate(pauseUntil.getDate() + days);
-
-      await updateSubscriptionStatus(
-        subscriptionId,
-        SubscriptionStatus.PAUSED,
-        pauseUntil
+  const getFilteredSubscriptions = () => {
+    if (activeTab === 'active') {
+      // Active tab: Show ACTIVE and PAUSED subscriptions only
+      return subscriptions.filter(
+        (sub) =>
+          sub.status === SubscriptionStatus.ACTIVE ||
+          sub.status === SubscriptionStatus.PAUSED
       );
-
-      Alert.alert('Success', `Subscription paused for ${days} days`);
-      await loadSubscriptions();
-    } catch (error) {
-      console.error('Error pausing subscription:', error);
-      Alert.alert('Error', 'Failed to pause subscription');
-    } finally {
-      setActionLoading(null);
+    } else {
+      // Closed tab: Show COMPLETED and CANCELLED subscriptions
+      return subscriptions.filter(
+        (sub) =>
+          sub.status === SubscriptionStatus.COMPLETED ||
+          sub.status === SubscriptionStatus.CANCELLED
+      );
     }
   };
 
-  const handleResumeSubscription = async (subscriptionId: string) => {
-    setActionLoading(subscriptionId);
-    try {
-      await updateSubscriptionStatus(subscriptionId, SubscriptionStatus.ACTIVE);
-      Alert.alert('Success', 'Subscription resumed successfully');
-      await loadSubscriptions();
-    } catch (error) {
-      console.error('Error resuming subscription:', error);
-      Alert.alert('Error', 'Failed to resume subscription');
-    } finally {
-      setActionLoading(null);
-    }
+  const getActiveCount = () => {
+    return subscriptions.filter(
+      (sub) =>
+        sub.status === SubscriptionStatus.ACTIVE ||
+        sub.status === SubscriptionStatus.PAUSED
+    ).length;
   };
 
-  const handleCancelSubscription = async (subscriptionId: string) => {
-    Alert.alert(
-      'Cancel Subscription',
-      'Are you sure you want to cancel this subscription? This action cannot be undone.',
-      [
-        { text: 'No', style: 'cancel' },
-        {
-          text: 'Yes, Cancel',
-          style: 'destructive',
-          onPress: async () => {
-            setActionLoading(subscriptionId);
-            try {
-              await updateSubscriptionStatus(
-                subscriptionId,
-                SubscriptionStatus.CANCELLED
-              );
-              Alert.alert('Success', 'Subscription cancelled');
-              await loadSubscriptions();
-            } catch (error) {
-              console.error('Error cancelling subscription:', error);
-              Alert.alert('Error', 'Failed to cancel subscription');
-            } finally {
-              setActionLoading(null);
-            }
-          },
-        },
-      ]
-    );
+  const getClosedCount = () => {
+    return subscriptions.filter(
+      (sub) =>
+        sub.status === SubscriptionStatus.COMPLETED ||
+        sub.status === SubscriptionStatus.CANCELLED
+    ).length;
   };
 
   const getStatusColor = (status: SubscriptionStatus) => {
@@ -151,6 +100,8 @@ export const SubscriptionsScreen = ({ navigation }: any) => {
         return '#4CAF50';
       case SubscriptionStatus.PAUSED:
         return '#FF9800';
+      case SubscriptionStatus.COMPLETED:
+        return '#2196F3'; // Blue for completed
       case SubscriptionStatus.CANCELLED:
         return '#f44336';
       default:
@@ -164,6 +115,8 @@ export const SubscriptionsScreen = ({ navigation }: any) => {
         return 'Active';
       case SubscriptionStatus.PAUSED:
         return 'Paused';
+      case SubscriptionStatus.COMPLETED:
+        return 'Completed';
       case SubscriptionStatus.CANCELLED:
         return 'Cancelled';
       default:
@@ -184,9 +137,19 @@ export const SubscriptionsScreen = ({ navigation }: any) => {
     }
   };
 
+  const calculateTotalAmount = (subscription: Subscription) => {
+    return subscription.items.reduce((total, item) => {
+      if (item.product) {
+        return total + item.product.price * item.quantity;
+      }
+      return total;
+    }, 0);
+  };
+
   const renderSubscription = ({ item }: { item: Subscription }) => {
-    const isActionLoading = actionLoading === item.id;
     const statusColor = getStatusColor(item.status);
+    const totalAmount = calculateTotalAmount(item);
+    const hasProductData = item.items.every((i) => i.product);
 
     return (
       <TouchableOpacity
@@ -206,75 +169,49 @@ export const SubscriptionsScreen = ({ navigation }: any) => {
 
         {/* Items */}
         <View style={styles.itemsContainer}>
-          {item.items.map((subItem, index) => (
-            <Text key={index} style={styles.itemText}>
-              • {subItem.product?.name || 'Product'} × {subItem.quantity}
-            </Text>
-          ))}
-        </View>
-
-        {/* Dates */}
-        <View style={styles.datesContainer}>
-          <Text style={styles.dateLabel}>
-            Started: {formatDate(item.startDate)}
-          </Text>
-          {item.pausedUntil && item.status === SubscriptionStatus.PAUSED && (
-            <Text style={styles.pausedText}>
-              Paused until: {formatDate(item.pausedUntil)}
-            </Text>
+          {!hasProductData ? (
+            <ActivityIndicator size="small" color="#4CAF50" />
+          ) : (
+            <>
+              {item.items.slice(0, 2).map((subItem, index) => (
+                <Text key={index} style={styles.itemText}>
+                  • {subItem.product?.name || 'Product'} × {subItem.quantity}
+                </Text>
+              ))}
+              {item.items.length > 2 && (
+                <Text style={styles.moreItems}>+{item.items.length - 2} more</Text>
+              )}
+            </>
           )}
         </View>
 
-        {/* Actions */}
-        {item.status !== SubscriptionStatus.CANCELLED && (
-          <View style={styles.actionsContainer}>
-            {item.status === SubscriptionStatus.ACTIVE && (
-              <>
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.pauseButton]}
-                  onPress={() => handlePauseSubscription(item.id)}
-                  disabled={isActionLoading}
-                >
-                  {isActionLoading ? (
-                    <ActivityIndicator size="small" color="#FF9800" />
-                  ) : (
-                    <Text style={styles.pauseButtonText}>Pause</Text>
-                  )}
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.cancelButton]}
-                  onPress={() => handleCancelSubscription(item.id)}
-                  disabled={isActionLoading}
-                >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-              </>
+        {/* Dates & Amount */}
+        <View style={styles.footer}>
+          <View style={styles.datesContainer}>
+            <Text style={styles.dateLabel}>
+              Start: {formatDate(item.startDate)}
+            </Text>
+            {item.endDate && (
+              <Text style={styles.dateLabel}>
+                End: {formatDate(item.endDate)}
+              </Text>
             )}
-
-            {item.status === SubscriptionStatus.PAUSED && (
-              <>
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.resumeButton]}
-                  onPress={() => handleResumeSubscription(item.id)}
-                  disabled={isActionLoading}
-                >
-                  {isActionLoading ? (
-                    <ActivityIndicator size="small" color="#4CAF50" />
-                  ) : (
-                    <Text style={styles.resumeButtonText}>Resume</Text>
-                  )}
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.cancelButton]}
-                  onPress={() => handleCancelSubscription(item.id)}
-                  disabled={isActionLoading}
-                >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-              </>
+            {item.pausedUntil && item.status === SubscriptionStatus.PAUSED && (
+              <Text style={styles.pausedText}>
+                Paused until: {formatDate(item.pausedUntil)}
+              </Text>
             )}
           </View>
-        )}
+          <View style={styles.amountContainer}>
+            <Text style={styles.amountLabel}>Per delivery</Text>
+            <Text style={styles.amountValue}>{formatCurrency(totalAmount)}</Text>
+          </View>
+        </View>
+
+        {/* Chevron */}
+        <View style={styles.chevronContainer}>
+          <Text style={styles.chevron}>›</Text>
+        </View>
       </TouchableOpacity>
     );
   };
@@ -299,28 +236,9 @@ export const SubscriptionsScreen = ({ navigation }: any) => {
     );
   }
 
-  if (subscriptions.length === 0) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>My Subscriptions</Text>
-        </View>
-        <View style={styles.centerContainer}>
-          <Text style={styles.emptyEmoji}>📅</Text>
-          <Text style={styles.emptyTitle}>No Subscriptions Yet</Text>
-          <Text style={styles.emptySubtitle}>
-            Subscribe to get daily deliveries of your favorite products
-          </Text>
-          <TouchableOpacity
-            style={styles.createButton}
-            onPress={() => navigation.navigate('CreateSubscription')}
-          >
-            <Text style={styles.createButtonText}>Create Subscription</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
+  const filteredSubscriptions = getFilteredSubscriptions();
+  const activeCount = getActiveCount();
+  const closedCount = getClosedCount();
 
   return (
     <View style={styles.container}>
@@ -335,14 +253,73 @@ export const SubscriptionsScreen = ({ navigation }: any) => {
         </TouchableOpacity>
       </View>
 
+      {/* Tabs */}
+      <View style={styles.tabsContainer}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'active' && styles.tabActive]}
+          onPress={() => setActiveTab('active')}
+        >
+          <Text style={[styles.tabText, activeTab === 'active' && styles.tabTextActive]}>
+            Active
+          </Text>
+          {activeCount > 0 && (
+            <View style={[styles.badge, activeTab === 'active' && styles.badgeActive]}>
+              <Text style={[styles.badgeText, activeTab === 'active' && styles.badgeTextActive]}>
+                {activeCount}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'closed' && styles.tabActive]}
+          onPress={() => setActiveTab('closed')}
+        >
+          <Text style={[styles.tabText, activeTab === 'closed' && styles.tabTextActive]}>
+            Closed
+          </Text>
+          {closedCount > 0 && (
+            <View style={[styles.badge, activeTab === 'closed' && styles.badgeActive]}>
+              <Text style={[styles.badgeText, activeTab === 'closed' && styles.badgeTextActive]}>
+                {closedCount}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
+
       {/* Subscriptions List */}
-      <FlatList
-        data={subscriptions}
-        renderItem={renderSubscription}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-      />
+      {filteredSubscriptions.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyEmoji}>
+            {activeTab === 'active' ? '📅' : '📋'}
+          </Text>
+          <Text style={styles.emptyTitle}>
+            {activeTab === 'active' ? 'No Active Subscriptions' : 'No Closed Subscriptions'}
+          </Text>
+          <Text style={styles.emptySubtitle}>
+            {activeTab === 'active'
+              ? 'Subscribe to get daily deliveries of your favorite products'
+              : 'Cancelled subscriptions will appear here'}
+          </Text>
+          {activeTab === 'active' && (
+            <TouchableOpacity
+              style={styles.createButton}
+              onPress={() => navigation.navigate('CreateSubscription')}
+            >
+              <Text style={styles.createButtonText}>Create Subscription</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      ) : (
+        <FlatList
+          data={filteredSubscriptions}
+          renderItem={renderSubscription}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
     </View>
   );
 };
@@ -384,6 +361,53 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  tabsContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  tab: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderBottomWidth: 3,
+    borderBottomColor: 'transparent',
+    gap: 8,
+  },
+  tabActive: {
+    borderBottomColor: '#4CAF50',
+  },
+  tabText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#999',
+  },
+  tabTextActive: {
+    fontWeight: '700',
+    color: '#4CAF50',
+  },
+  badge: {
+    backgroundColor: '#e0e0e0',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    minWidth: 24,
+    alignItems: 'center',
+  },
+  badgeActive: {
+    backgroundColor: '#4CAF50',
+  },
+  badgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+  },
+  badgeTextActive: {
+    color: '#fff',
+  },
   listContent: {
     padding: 16,
   },
@@ -397,12 +421,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
+    position: 'relative',
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 12,
+    paddingRight: 24,
   },
   subscriptionId: {
     fontSize: 14,
@@ -436,8 +462,20 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 4,
   },
+  moreItems: {
+    fontSize: 13,
+    color: '#4CAF50',
+    fontWeight: '500',
+    marginTop: 4,
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    paddingRight: 24,
+  },
   datesContainer: {
-    marginBottom: 12,
+    flex: 1,
   },
   dateLabel: {
     fontSize: 12,
@@ -448,44 +486,36 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#FF9800',
     fontWeight: '500',
+    marginTop: 2,
   },
-  actionsContainer: {
-    flexDirection: 'row',
-    gap: 8,
+  amountContainer: {
+    alignItems: 'flex-end',
   },
-  actionButton: {
+  amountLabel: {
+    fontSize: 11,
+    color: '#999',
+    marginBottom: 4,
+  },
+  amountValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  chevronContainer: {
+    position: 'absolute',
+    right: 12,
+    top: '50%',
+    marginTop: -12,
+  },
+  chevron: {
+    fontSize: 24,
+    color: '#ccc',
+  },
+  emptyContainer: {
     flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
+    justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-  },
-  pauseButton: {
-    borderColor: '#FF9800',
-    backgroundColor: '#fff',
-  },
-  pauseButtonText: {
-    color: '#FF9800',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  resumeButton: {
-    borderColor: '#4CAF50',
-    backgroundColor: '#4CAF50',
-  },
-  resumeButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  cancelButton: {
-    borderColor: '#f44336',
-    backgroundColor: '#fff',
-  },
-  cancelButtonText: {
-    color: '#f44336',
-    fontSize: 14,
-    fontWeight: '600',
+    padding: 20,
   },
   emptyEmoji: {
     fontSize: 80,

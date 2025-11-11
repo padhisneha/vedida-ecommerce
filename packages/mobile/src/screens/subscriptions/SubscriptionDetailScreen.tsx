@@ -46,39 +46,45 @@ export const SubscriptionDetailScreen = ({ route, navigation }: any) => {
     const getStatusColor = (status: SubscriptionStatus) => {
         switch (status) {
             case SubscriptionStatus.ACTIVE:
-                return '#4CAF50';
+            return '#4CAF50';
             case SubscriptionStatus.PAUSED:
-                return '#FF9800';
+            return '#FF9800';
+            case SubscriptionStatus.COMPLETED:
+            return '#2196F3';
             case SubscriptionStatus.CANCELLED:
-                return '#f44336';
+            return '#f44336';
             default:
-                return '#999';
+            return '#999';
         }
     };
 
     const getStatusText = (status: SubscriptionStatus) => {
         switch (status) {
             case SubscriptionStatus.ACTIVE:
-                return 'Active';
+            return 'Active';
             case SubscriptionStatus.PAUSED:
-                return 'Paused';
+            return 'Paused';
+            case SubscriptionStatus.COMPLETED:
+            return 'Completed';
             case SubscriptionStatus.CANCELLED:
-                return 'Cancelled';
+            return 'Cancelled';
             default:
-                return status;
+            return status;
         }
     };
 
     const getStatusIcon = (status: SubscriptionStatus) => {
         switch (status) {
             case SubscriptionStatus.ACTIVE:
-                return '✅';
+            return '✅';
             case SubscriptionStatus.PAUSED:
-                return '⏸️';
+            return '⏸️';
+            case SubscriptionStatus.COMPLETED:
+            return '🎉';
             case SubscriptionStatus.CANCELLED:
-                return '❌';
+            return '❌';
             default:
-                return '📋';
+            return '📋';
         }
     };
 
@@ -219,7 +225,7 @@ export const SubscriptionDetailScreen = ({ route, navigation }: any) => {
             <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
                 {/* Status Card */}
                 <View style={styles.statusCard}>
-                    <Text style={styles.statusIcon}>{statusIcon}</Text>
+                    {/* <Text style={styles.statusIcon}>{statusIcon}</Text> */}
                     <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
                         <Text style={styles.statusText}>{getStatusText(subscription.status)}</Text>
                     </View>
@@ -315,54 +321,80 @@ export const SubscriptionDetailScreen = ({ route, navigation }: any) => {
                 </View>
 
                 {/* Action Buttons */}
-                {subscription.status !== SubscriptionStatus.CANCELLED && (
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>⚙️ Actions</Text>
-                        <View style={styles.actionsContainer}>
-                            {subscription.status === SubscriptionStatus.ACTIVE && (
-                                <>
-                                    <TouchableOpacity
-                                        style={[styles.actionButton, styles.pauseButton]}
-                                        onPress={handlePauseSubscription}
-                                        disabled={actionLoading}
-                                    >
-                                        <Text style={styles.pauseButtonText}>⏸️ Pause Subscription</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={[styles.actionButton, styles.cancelButton]}
-                                        onPress={handleCancelSubscription}
-                                        disabled={actionLoading}
-                                    >
-                                        <Text style={styles.cancelButtonText}>❌ Cancel Subscription</Text>
-                                    </TouchableOpacity>
-                                </>
-                            )}
+                {subscription.status !== SubscriptionStatus.CANCELLED && 
+                subscription.status !== SubscriptionStatus.COMPLETED && (
+                <View style={styles.section}>
+                    {/* <Text style={styles.sectionTitle}>⚙️ Actions</Text> */}
+                    <View style={styles.actionsContainer}>
+                    {subscription.status === SubscriptionStatus.ACTIVE && (
+                        <>
+                        <TouchableOpacity
+                            style={[styles.actionButton, styles.pauseButton]}
+                            onPress={handlePauseSubscription}
+                            disabled={actionLoading}
+                        >
+                            <Text style={styles.pauseButtonText}>⏸️ Pause Subscription</Text>
+                        </TouchableOpacity>
+                        {/* <TouchableOpacity
+                            style={[styles.actionButton, styles.cancelButton]}
+                            onPress={handleCancelSubscription}
+                            disabled={actionLoading}
+                        >
+                            <Text style={styles.cancelButtonText}>❌ Cancel Subscription</Text>
+                        </TouchableOpacity> */}
+                        </>
+                    )}
 
-                            {subscription.status === SubscriptionStatus.PAUSED && (
-                                <>
-                                    <TouchableOpacity
-                                        style={[styles.actionButton, styles.resumeButton]}
-                                        onPress={handleResumeSubscription}
-                                        disabled={actionLoading}
-                                    >
-                                        {actionLoading ? (
-                                            <ActivityIndicator size="small" color="#fff" />
-                                        ) : (
-                                            <Text style={styles.resumeButtonText}>▶️ Resume Subscription</Text>
-                                        )}
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={[styles.actionButton, styles.cancelButton]}
-                                        onPress={handleCancelSubscription}
-                                        disabled={actionLoading}
-                                    >
-                                        <Text style={styles.cancelButtonText}>❌ Cancel Subscription</Text>
-                                    </TouchableOpacity>
-                                </>
+                    {subscription.status === SubscriptionStatus.PAUSED && (
+                        <>
+                        <TouchableOpacity
+                            style={[styles.actionButton, styles.resumeButton]}
+                            onPress={handleResumeSubscription}
+                            disabled={actionLoading}
+                        >
+                            {actionLoading ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                            ) : (
+                            <Text style={styles.resumeButtonText}>▶️ Resume Subscription</Text>
                             )}
-                        </View>
+                        </TouchableOpacity>
+                        {/* <TouchableOpacity
+                            style={[styles.actionButton, styles.cancelButton]}
+                            onPress={handleCancelSubscription}
+                            disabled={actionLoading}
+                        >
+                            <Text style={styles.cancelButtonText}>❌ Cancel Subscription</Text>
+                        </TouchableOpacity> */}
+                        </>
+                    )}
                     </View>
+                </View>
                 )}
+
+                {/* Show info for completed/cancelled */}
+                {subscription.status === SubscriptionStatus.COMPLETED && (
+                <View style={styles.section}>
+                    <View style={styles.completedCard}>
+                    <Text style={styles.completedIcon}>🎉</Text>
+                    <Text style={styles.completedTitle}>Subscription Completed</Text>
+                    <Text style={styles.completedText}>
+                        This subscription has ended as per the scheduled end date.
+                    </Text>
+                    </View>
+                </View>
+                )}
+
+                {subscription.status === SubscriptionStatus.CANCELLED && (
+                <View style={styles.section}>
+                    <View style={styles.cancelledCard}>
+                    <Text style={styles.cancelledIcon}>❌</Text>
+                    <Text style={styles.cancelledTitle}>Subscription Cancelled</Text>
+                    <Text style={styles.cancelledText}>
+                        This subscription was cancelled and is no longer active.
+                    </Text>
+                    </View>
+                </View>
+                )}                
 
                 <View style={styles.bottomSpacer} />
             </ScrollView>
@@ -613,5 +645,51 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 16,
         fontWeight: '600',
+    },
+    completedCard: {
+        backgroundColor: '#e3f2fd',
+        padding: 16,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#2196F3',
+        alignItems: 'center',
+    },
+    completedIcon: {
+        fontSize: 40,
+        marginBottom: 12,
+    },
+    completedTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#1565C0',
+        marginBottom: 8,
+    },
+    completedText: {
+        fontSize: 14,
+        color: '#1976D2',
+        textAlign: 'center',
+    },
+    cancelledCard: {
+        backgroundColor: '#ffebee',
+        padding: 16,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#f44336',
+        alignItems: 'center',
+    },
+    cancelledIcon: {
+        fontSize: 40,
+        marginBottom: 12,
+    },
+    cancelledTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#c62828',
+        marginBottom: 8,
+    },
+    cancelledText: {
+        fontSize: 14,
+        color: '#d32f2f',
+        textAlign: 'center',
     },
 });

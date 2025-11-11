@@ -74,6 +74,58 @@ export const getUserSubscriptions = async (userId: string): Promise<Subscription
 };
 
 /**
+ * Get user's subscriptions with populated product details
+ */
+export const getUserSubscriptionsWithProducts = async (userId: string): Promise<Subscription[]> => {
+  const db = getFirebaseFirestore();
+  const q = query(
+    collection(db, COLLECTIONS.SUBSCRIPTIONS),
+    where('userId', '==', userId),
+    orderBy('createdAt', 'desc')
+  );
+  const snapshot = await getDocs(q);
+
+  // Fetch subscriptions with populated products
+  const subscriptionsWithProducts = await Promise.all(
+    snapshot.docs.map(async (doc) => {
+      const data = doc.data();
+      
+      // Handle old schema with deliveryAddressId
+      if (!data.deliveryAddress && data.deliveryAddressId) {
+        data.deliveryAddress = {
+          id: data.deliveryAddressId,
+          label: 'Address',
+          street: 'Address details not available',
+          city: '-',
+          state: '-',
+          pincode: '000000',
+          isDefault: false,
+        };
+      }
+
+      // Populate product details for each item
+      const itemsWithProducts = await Promise.all(
+        (data.items || []).map(async (item: any) => {
+          const product = await getProductById(item.productId);
+          return {
+            ...item,
+            product: product || undefined,
+          };
+        })
+      );
+
+      return {
+        id: doc.id,
+        ...data,
+        items: itemsWithProducts,
+      } as Subscription;
+    })
+  );
+
+  return subscriptionsWithProducts;
+};
+
+/**
  * Get active user subscriptions
  */
 export const getActiveUserSubscriptions = async (

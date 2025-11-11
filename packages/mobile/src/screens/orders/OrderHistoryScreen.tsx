@@ -10,17 +10,20 @@ import {
 } from 'react-native';
 import {
   useAuthStore,
-  getUserOrders,
+  getUserOrdersWithProducts,
   Order,
   OrderStatus,
   formatCurrency,
   formatDate,
 } from '@ecommerce/shared';
 
+type TabType = 'active' | 'closed';
+
 export const OrderHistoryScreen = ({ navigation }: any) => {
   const { user } = useAuthStore();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<TabType>('active');
 
   useEffect(() => {
     if (user) {
@@ -34,14 +37,68 @@ export const OrderHistoryScreen = ({ navigation }: any) => {
     if (!user) return;
 
     try {
-      const data = await getUserOrders(user.id);
+      const data = await getUserOrdersWithProducts(user.id); // Changed
       setOrders(data);
+      console.log('✅ Loaded orders with products:', data.length);
+      
+      // Debug: Log first order's items
+      if (data.length > 0) {
+        console.log('First order items:', data[0].items.map(item => ({
+          name: item.product?.name || 'NO PRODUCT',
+          quantity: item.quantity,
+        })));
+      }
     } catch (error) {
       console.error('Error loading orders:', error);
       Alert.alert('Error', 'Failed to load orders');
     } finally {
       setLoading(false);
     }
+  };
+
+  const isOrderOlderThan90Days = (order: Order) => {
+    const now = new Date();
+    const orderDate = order.createdAt.toDate();
+    const daysDiff = Math.floor((now.getTime() - orderDate.getTime()) / (1000 * 60 * 60 * 24));
+    return daysDiff > 90;
+  };
+
+  const getFilteredOrders = () => {
+    if (activeTab === 'active') {
+      // Active tab: Show PENDING, CONFIRMED, and OUT_FOR_DELIVERY orders
+      return orders.filter(
+        (order) =>
+          order.status === OrderStatus.PENDING ||
+          order.status === OrderStatus.CONFIRMED ||
+          order.status === OrderStatus.OUT_FOR_DELIVERY
+      );
+    } else {
+      // Closed tab: Show DELIVERED and CANCELLED orders (only last 90 days)
+      return orders.filter(
+        (order) =>
+          (order.status === OrderStatus.DELIVERED ||
+            order.status === OrderStatus.CANCELLED) &&
+          !isOrderOlderThan90Days(order)
+      );
+    }
+  };
+
+  const getActiveCount = () => {
+    return orders.filter(
+      (order) =>
+        order.status === OrderStatus.PENDING ||
+        order.status === OrderStatus.CONFIRMED ||
+        order.status === OrderStatus.OUT_FOR_DELIVERY
+    ).length;
+  };
+
+  const getClosedCount = () => {
+    return orders.filter(
+      (order) =>
+        (order.status === OrderStatus.DELIVERED ||
+          order.status === OrderStatus.CANCELLED) &&
+        !isOrderOlderThan90Days(order)
+    ).length;
   };
 
   const getStatusColor = (status: OrderStatus) => {
@@ -115,9 +172,13 @@ export const OrderHistoryScreen = ({ navigation }: any) => {
         {/* Footer */}
         <View style={styles.orderFooter}>
           <View>
-            <Text style={styles.deliveryLabel}>Delivery Date</Text>
+            <Text style={styles.deliveryLabel}>
+              {item.status === OrderStatus.DELIVERED ? 'Delivered On' : 'Delivery Date'}
+            </Text>
             <Text style={styles.deliveryDate}>
-              {formatDate(item.scheduledDeliveryDate)}
+              {item.deliveredAt
+                ? formatDate(item.deliveredAt)
+                : formatDate(item.scheduledDeliveryDate)}
             </Text>
           </View>
           <View style={styles.totalContainer}>
@@ -156,48 +217,88 @@ export const OrderHistoryScreen = ({ navigation }: any) => {
     );
   }
 
-  if (orders.length === 0) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Order History</Text>
-        </View>
-        <View style={styles.centerContainer}>
-          <Text style={styles.emptyEmoji}>📦</Text>
-          <Text style={styles.emptyTitle}>No Orders Yet</Text>
-          <Text style={styles.emptySubtitle}>
-            Your order history will appear here
-          </Text>
-          <TouchableOpacity
-            style={styles.shopButton}
-            onPress={() => navigation.navigate('HomeTab')}
-          >
-            <Text style={styles.shopButtonText}>Start Shopping</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
+  const filteredOrders = getFilteredOrders();
+  const activeCount = getActiveCount();
+  const closedCount = getClosedCount();
 
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backButton}>‹ Back</Text>
+          <Text style={styles.backButton}>‹</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Order History</Text>
         <View style={styles.placeholder} />
       </View>
 
+      {/* Tabs */}
+      <View style={styles.tabsContainer}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'active' && styles.tabActive]}
+          onPress={() => setActiveTab('active')}
+        >
+          <Text style={[styles.tabText, activeTab === 'active' && styles.tabTextActive]}>
+            Active
+          </Text>
+          {activeCount > 0 && (
+            <View style={[styles.badge, activeTab === 'active' && styles.badgeActive]}>
+              <Text style={[styles.badgeText, activeTab === 'active' && styles.badgeTextActive]}>
+                {activeCount}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'closed' && styles.tabActive]}
+          onPress={() => setActiveTab('closed')}
+        >
+          <Text style={[styles.tabText, activeTab === 'closed' && styles.tabTextActive]}>
+            Closed
+          </Text>
+          {closedCount > 0 && (
+            <View style={[styles.badge, activeTab === 'closed' && styles.badgeActive]}>
+              <Text style={[styles.badgeText, activeTab === 'closed' && styles.badgeTextActive]}>
+                {closedCount}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
+
       {/* Orders List */}
-      <FlatList
-        data={orders}
-        renderItem={renderOrder}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-      />
+      {filteredOrders.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyEmoji}>
+            {activeTab === 'active' ? '📦' : '📋'}
+          </Text>
+          <Text style={styles.emptyTitle}>
+            {activeTab === 'active' ? 'No Active Orders' : 'No Closed Orders'}
+          </Text>
+          <Text style={styles.emptySubtitle}>
+            {activeTab === 'active'
+              ? 'Your ongoing orders will appear here'
+              : 'Delivered and cancelled orders from the last 90 days will appear here'}
+          </Text>
+          {activeTab === 'active' && (
+            <TouchableOpacity
+              style={styles.shopButton}
+              onPress={() => navigation.navigate('HomeTab')}
+            >
+              <Text style={styles.shopButtonText}>Start Shopping</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      ) : (
+        <FlatList
+          data={filteredOrders}
+          renderItem={renderOrder}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
     </View>
   );
 };
@@ -224,7 +325,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e0e0e0',
   },
   backButton: {
-    fontSize: 16,
+    fontSize: 32,
     color: '#4CAF50',
     fontWeight: '600',
   },
@@ -234,7 +335,54 @@ const styles = StyleSheet.create({
     color: '#1a1a1a',
   },
   placeholder: {
-    width: 30,
+    width: 32,
+  },
+  tabsContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  tab: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderBottomWidth: 3,
+    borderBottomColor: 'transparent',
+    gap: 8,
+  },
+  tabActive: {
+    borderBottomColor: '#4CAF50',
+  },
+  tabText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#999',
+  },
+  tabTextActive: {
+    fontWeight: '700',
+    color: '#4CAF50',
+  },
+  badge: {
+    backgroundColor: '#e0e0e0',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    minWidth: 24,
+    alignItems: 'center',
+  },
+  badgeActive: {
+    backgroundColor: '#4CAF50',
+  },
+  badgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+  },
+  badgeTextActive: {
+    color: '#fff',
   },
   listContent: {
     padding: 16,
@@ -341,6 +489,12 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: '#ccc',
   },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
   emptyEmoji: {
     fontSize: 80,
     marginBottom: 16,
@@ -356,6 +510,8 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     marginBottom: 24,
+    paddingHorizontal: 40,
+    lineHeight: 24,
   },
   shopButton: {
     backgroundColor: '#4CAF50',

@@ -13,91 +13,46 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import {
   updateSubscriptionStatus,
   SubscriptionStatus,
-  dateToTimestamp,
 } from '@ecommerce/shared';
 
 export const PauseSubscriptionScreen = ({ route, navigation }: any) => {
   const { subscriptionId } = route.params;
 
-  // Calculate default dates
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(0, 0, 0, 0);
+  // Pause starts tomorrow
+  const pauseStartDate = new Date();
+  pauseStartDate.setDate(pauseStartDate.getDate() + 1);
+  pauseStartDate.setHours(0, 0, 0, 0);
 
-  const oneWeekLater = new Date(tomorrow);
-  oneWeekLater.setDate(oneWeekLater.getDate() + 7);
+  // Default resume date: 7 days from pause start
+  const defaultResumeDate = new Date(pauseStartDate);
+  defaultResumeDate.setDate(defaultResumeDate.getDate() + 7);
 
-  const [startDate, setStartDate] = useState<Date>(tomorrow);
-  const [endDate, setEndDate] = useState<Date>(oneWeekLater);
-  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
-  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  const [resumeDate, setResumeDate] = useState<Date>(defaultResumeDate);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const calculatePauseDays = () => {
-    const diffTime = endDate.getTime() - startDate.getTime();
+    const diffTime = resumeDate.getTime() - pauseStartDate.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays;
   };
 
-  const quickOptions = [
-    { label: '1 Week', days: 7, icon: '📅' },
-    { label: '2 Weeks', days: 14, icon: '📆' },
-    { label: '1 Month', days: 30, icon: '🗓️' },
-  ];
-
-  const handleQuickSelect = (days: number) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const start = new Date(today);
-    start.setDate(start.getDate() + 1);
-
-    const end = new Date(start);
-    end.setDate(end.getDate() + days);
-
-    setStartDate(start);
-    setEndDate(end);
-  };
-
-  const onStartDateChange = (event: any, selectedDate?: Date) => {
-    setShowStartDatePicker(Platform.OS === 'ios');
+  const onDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(Platform.OS === 'ios');
 
     if (selectedDate) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      if (selectedDate <= today) {
-        Alert.alert('Invalid Date', 'Start date must be in the future');
+      if (selectedDate <= pauseStartDate) {
+        Alert.alert('Invalid Date', 'Resume date must be after the pause start date');
         return;
       }
 
-      setStartDate(selectedDate);
-
-      // Adjust end date if it's before the new start date
-      if (selectedDate >= endDate) {
-        const newEndDate = new Date(selectedDate);
-        newEndDate.setDate(newEndDate.getDate() + 7);
-        setEndDate(newEndDate);
-      }
-    }
-  };
-
-  const onEndDateChange = (event: any, selectedDate?: Date) => {
-    setShowEndDatePicker(Platform.OS === 'ios');
-
-    if (selectedDate) {
-      if (selectedDate <= startDate) {
-        Alert.alert('Invalid Date', 'End date must be after start date');
-        return;
-      }
-
-      setEndDate(selectedDate);
+      setResumeDate(selectedDate);
     }
   };
 
   const handlePauseSubscription = async () => {
-    if (endDate <= startDate) {
-      Alert.alert('Invalid Dates', 'End date must be after start date');
+    if (resumeDate <= pauseStartDate) {
+      Alert.alert('Invalid Date', 'Resume date must be after tomorrow');
       return;
     }
 
@@ -105,23 +60,23 @@ export const PauseSubscriptionScreen = ({ route, navigation }: any) => {
 
     Alert.alert(
       'Confirm Pause',
-      `Pause subscription from ${startDate.toLocaleDateString('en-IN')} to ${endDate.toLocaleDateString('en-IN')}?\n\nTotal: ${days} days`,
+      `Your subscription will be paused from ${pauseStartDate.toLocaleDateString('en-IN')} and will automatically resume on ${resumeDate.toLocaleDateString('en-IN')}.\n\nTotal pause duration: ${days} ${days === 1 ? 'day' : 'days'}`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Confirm',
+          text: 'Confirm Pause',
           onPress: async () => {
             setLoading(true);
             try {
               await updateSubscriptionStatus(
                 subscriptionId,
                 SubscriptionStatus.PAUSED,
-                endDate
+                resumeDate
               );
 
               Alert.alert(
                 'Subscription Paused! ⏸️',
-                `Your subscription will be paused for ${days} days.`,
+                `Your subscription will be paused for ${days} ${days === 1 ? 'day' : 'days'}.`,
                 [
                   {
                     text: 'OK',
@@ -148,7 +103,7 @@ export const PauseSubscriptionScreen = ({ route, navigation }: any) => {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backButton}>✕</Text>
+          <Text style={styles.backButton}>‹</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Pause Subscription</Text>
         <View style={styles.placeholder} />
@@ -160,85 +115,47 @@ export const PauseSubscriptionScreen = ({ route, navigation }: any) => {
           <Text style={styles.infoIcon}>⏸️</Text>
           <Text style={styles.infoTitle}>Temporarily Pause Deliveries</Text>
           <Text style={styles.infoSubtitle}>
-            Your subscription will be automatically resumed after the pause period
+            Your subscription will automatically resume on the date you choose
           </Text>
         </View>
 
-        {/* Quick Options */}
+        {/* Pause Details */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>⚡ Quick Options</Text>
-          <View style={styles.quickOptionsContainer}>
-            {quickOptions.map((option) => (
-              <TouchableOpacity
-                key={option.days}
-                style={[
-                  styles.quickOption,
-                  pauseDays === option.days && styles.quickOptionActive,
-                ]}
-                onPress={() => handleQuickSelect(option.days)}
-              >
-                <Text style={styles.quickOptionIcon}>{option.icon}</Text>
-                <Text
-                  style={[
-                    styles.quickOptionLabel,
-                    pauseDays === option.days && styles.quickOptionLabelActive,
-                  ]}
-                >
-                  {option.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+          <Text style={styles.sectionTitle}>📅 Pause Schedule</Text>
 
-        {/* Divider */}
-        <View style={styles.dividerContainer}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>OR</Text>
-          <View style={styles.dividerLine} />
-        </View>
-
-        {/* Custom Date Selection */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📅 Custom Pause Period</Text>
-
-          {/* Start Date */}
-          <View style={styles.dateSelector}>
-            <Text style={styles.dateLabel}>Pause From</Text>
-            <TouchableOpacity
-              style={styles.dateButton}
-              onPress={() => setShowStartDatePicker(true)}
-            >
-              <Text style={styles.dateIcon}>📅</Text>
-              <View style={styles.dateTextContainer}>
-                <Text style={styles.dateText}>
-                  {startDate.toLocaleDateString('en-IN', {
-                    weekday: 'short',
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric',
-                  })}
-                </Text>
-                <Text style={styles.dateSubtext}>Tap to change</Text>
-              </View>
-              <Text style={styles.chevron}>›</Text>
-            </TouchableOpacity>
+          {/* Pause Start Date (Read-only) */}
+          <View style={styles.dateInfoCard}>
+            <Text style={styles.dateInfoLabel}>Pause From</Text>
+            <View style={styles.dateInfoValue}>
+              <Text style={styles.dateInfoIcon}>📅</Text>
+              <Text style={styles.dateInfoText}>
+                {pauseStartDate.toLocaleDateString('en-IN', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                })}
+              </Text>
+            </View>
+            <Text style={styles.dateInfoSubtext}>
+              (Tomorrow - Deliveries will stop from this date)
+            </Text>
           </View>
 
-          {/* End Date */}
+          {/* Resume Date (Selectable) */}
           <View style={styles.dateSelector}>
             <Text style={styles.dateLabel}>Resume On</Text>
             <TouchableOpacity
               style={styles.dateButton}
-              onPress={() => setShowEndDatePicker(true)}
+              onPress={() => setShowDatePicker(true)}
             >
               <Text style={styles.dateIcon}>📅</Text>
               <View style={styles.dateTextContainer}>
                 <Text style={styles.dateText}>
-                  {endDate.toLocaleDateString('en-IN', {
-                    weekday: 'short',
+                  {resumeDate.toLocaleDateString('en-IN', {
+                    weekday: 'long',
                     year: 'numeric',
-                    month: 'short',
+                    month: 'long',
                     day: 'numeric',
                   })}
                 </Text>
@@ -248,24 +165,14 @@ export const PauseSubscriptionScreen = ({ route, navigation }: any) => {
             </TouchableOpacity>
           </View>
 
-          {/* Date Pickers */}
-          {showStartDatePicker && (
+          {/* Date Picker */}
+          {showDatePicker && (
             <DateTimePicker
-              value={startDate}
+              value={resumeDate}
               mode="date"
               display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onChange={onStartDateChange}
-              minimumDate={tomorrow}
-            />
-          )}
-
-          {showEndDatePicker && (
-            <DateTimePicker
-              value={endDate}
-              mode="date"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onChange={onEndDateChange}
-              minimumDate={new Date(startDate.getTime() + 24 * 60 * 60 * 1000)}
+              onChange={onDateChange}
+              minimumDate={new Date(pauseStartDate.getTime() + 24 * 60 * 60 * 1000)}
             />
           )}
 
@@ -283,19 +190,19 @@ export const PauseSubscriptionScreen = ({ route, navigation }: any) => {
 
         {/* Important Notes */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📝 Important Notes</Text>
+          <Text style={styles.sectionTitle}>📝 Important Information</Text>
           <View style={styles.noteCard}>
             <Text style={styles.noteText}>
-              • No deliveries will be made during the pause period
+              • Pause starts from tomorrow - no deliveries during this period
             </Text>
             <Text style={styles.noteText}>
-              • Your subscription will automatically resume on the end date
+              • Your subscription will automatically resume on the selected date
             </Text>
             <Text style={styles.noteText}>
-              • You can resume or cancel anytime from subscription details
+              • You can manually resume or cancel anytime from subscription details
             </Text>
             <Text style={styles.noteText}>
-              • No charges will be deducted during pause
+              • No charges will be deducted during the pause period
             </Text>
           </View>
         </View>
@@ -305,12 +212,26 @@ export const PauseSubscriptionScreen = ({ route, navigation }: any) => {
 
       {/* Pause Button */}
       <View style={styles.footer}>
-        <View style={styles.footerInfo}>
-          <Text style={styles.footerLabel}>Duration</Text>
-          <Text style={styles.footerValue}>
-            {pauseDays} {pauseDays === 1 ? 'day' : 'days'}
-          </Text>
+        <View style={styles.footerSummary}>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Pause starts</Text>
+            <Text style={styles.summaryValue}>Tomorrow</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Resume on</Text>
+            <Text style={styles.summaryValue}>
+              {resumeDate.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
+            </Text>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.summaryRow}>
+            <Text style={styles.totalLabel}>Duration</Text>
+            <Text style={styles.totalValue}>
+              {pauseDays} {pauseDays === 1 ? 'day' : 'days'}
+            </Text>
+          </View>
         </View>
+
         <TouchableOpacity
           style={[styles.pauseButton, loading && styles.buttonDisabled]}
           onPress={handlePauseSubscription}
@@ -343,7 +264,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e0e0e0',
   },
   backButton: {
-    fontSize: 28,
+    fontSize: 32,
     color: '#FF9800',
     fontWeight: '600',
   },
@@ -353,7 +274,7 @@ const styles = StyleSheet.create({
     color: '#1a1a1a',
   },
   placeholder: {
-    width: 28,
+    width: 32,
   },
   scrollView: {
     flex: 1,
@@ -370,17 +291,18 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   infoTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#1a1a1a',
     marginBottom: 8,
     textAlign: 'center',
   },
   infoSubtitle: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#666',
     textAlign: 'center',
     paddingHorizontal: 20,
+    lineHeight: 22,
   },
   section: {
     backgroundColor: '#fff',
@@ -393,52 +315,39 @@ const styles = StyleSheet.create({
     color: '#1a1a1a',
     marginBottom: 16,
   },
-  quickOptionsContainer: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  quickOption: {
-    flex: 1,
-    backgroundColor: '#f9f9f9',
+  dateInfoCard: {
+    backgroundColor: '#e8f5e9',
     padding: 16,
     borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#e0e0e0',
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+    marginBottom: 20,
   },
-  quickOptionActive: {
-    backgroundColor: '#fff3e0',
-    borderColor: '#FF9800',
-  },
-  quickOptionIcon: {
-    fontSize: 32,
+  dateInfoLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#2e7d32',
     marginBottom: 8,
   },
-  quickOptionLabel: {
-    fontSize: 12,
-    color: '#666',
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  quickOptionLabelActive: {
-    color: '#FF9800',
-  },
-  dividerContainer: {
+  dateInfoValue: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 20,
+    marginBottom: 8,
   },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#e0e0e0',
+  dateInfoIcon: {
+    fontSize: 20,
+    marginRight: 8,
   },
-  dividerText: {
-    fontSize: 12,
-    color: '#999',
+  dateInfoText: {
+    fontSize: 16,
     fontWeight: '600',
-    marginHorizontal: 16,
+    color: '#1a1a1a',
+    flex: 1,
+  },
+  dateInfoSubtext: {
+    fontSize: 12,
+    color: '#666',
+    fontStyle: 'italic',
   },
   dateSelector: {
     marginBottom: 16,
@@ -456,7 +365,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#e0e0e0',
+    borderColor: '#FF9800',
   },
   dateIcon: {
     fontSize: 24,
@@ -477,7 +386,7 @@ const styles = StyleSheet.create({
   },
   chevron: {
     fontSize: 24,
-    color: '#ccc',
+    color: '#FF9800',
   },
   durationCard: {
     flexDirection: 'row',
@@ -487,7 +396,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#FF9800',
-    marginTop: 8,
   },
   durationIcon: {
     fontSize: 32,
@@ -502,7 +410,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   durationValue: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#FF9800',
   },
@@ -516,7 +424,7 @@ const styles = StyleSheet.create({
   noteText: {
     fontSize: 14,
     color: '#1565C0',
-    marginBottom: 8,
+    marginBottom: 10,
     lineHeight: 20,
   },
   bottomSpacer: {
@@ -529,17 +437,38 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 30,
   },
-  footerInfo: {
+  footerSummary: {
+    backgroundColor: '#f9f9f9',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 8,
   },
-  footerLabel: {
-    fontSize: 16,
+  summaryLabel: {
+    fontSize: 14,
     color: '#666',
   },
-  footerValue: {
+  summaryValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#e0e0e0',
+    marginVertical: 12,
+  },
+  totalLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1a1a1a',
+  },
+  totalValue: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#FF9800',

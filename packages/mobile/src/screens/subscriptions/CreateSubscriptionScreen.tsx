@@ -204,9 +204,9 @@ export const CreateSubscriptionScreen = ({ navigation }: any) => {
 };
 
   const frequencies = [
-    { value: SubscriptionFrequency.DAILY, label: 'Daily', icon: '📅' },
-    { value: SubscriptionFrequency.ALTERNATE_DAYS, label: 'Alternate Days', icon: '📆' },
-    { value: SubscriptionFrequency.WEEKLY, label: 'Weekly', icon: '🗓️' },
+    { value: SubscriptionFrequency.DAILY, label: 'Daily', icon: '🗓️' },
+    //{ value: SubscriptionFrequency.ALTERNATE_DAYS, label: 'Alternate Days', icon: '📆' },
+    //{ value: SubscriptionFrequency.WEEKLY, label: 'Weekly', icon: '🗓️' },
   ];
 
   if (loading) {
@@ -226,7 +226,7 @@ export const CreateSubscriptionScreen = ({ navigation }: any) => {
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Duration Selection */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📅 Subscription Duration</Text>
+          <Text style={styles.sectionTitle}>Subscription Duration</Text>
           
           {/* Start Date Picker */}
           <View style={styles.datePickerContainer}>
@@ -336,7 +336,7 @@ export const CreateSubscriptionScreen = ({ navigation }: any) => {
 
         {/* Product Selection */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🥛 Select Products</Text>
+          <Text style={styles.sectionTitle}> Select Products</Text>
           {products.map((product) => {
             const selected = isProductSelected(product.id);
             const quantity = getProductQuantity(product.id);

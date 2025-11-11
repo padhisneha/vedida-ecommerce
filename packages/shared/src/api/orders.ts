@@ -13,6 +13,7 @@ import {
 import { getFirebaseFirestore } from './firebase-config';
 import { Order, OrderStatus, OrderType, COLLECTIONS } from '../types';
 import { getCurrentTimestamp } from '../utils';
+import { getProductById } from './products';
 
 /**
  * Generate order number
@@ -81,6 +82,45 @@ export const getUserOrders = async (userId: string): Promise<Order[]> => {
 };
 
 /**
+ * Get user's orders with populated product details
+ */
+export const getUserOrdersWithProducts = async (userId: string): Promise<Order[]> => {
+  const db = getFirebaseFirestore();
+  const q = query(
+    collection(db, COLLECTIONS.ORDERS),
+    where('userId', '==', userId),
+    orderBy('createdAt', 'desc')
+  );
+  const snapshot = await getDocs(q);
+
+  // Fetch orders with populated products
+  const ordersWithProducts = await Promise.all(
+    snapshot.docs.map(async (doc) => {
+      const data = doc.data();
+
+      // Populate product details for each item
+      const itemsWithProducts = await Promise.all(
+        (data.items || []).map(async (item: any) => {
+          const product = await getProductById(item.productId);
+          return {
+            ...item,
+            product: product || undefined,
+          };
+        })
+      );
+
+      return {
+        id: doc.id,
+        ...data,
+        items: itemsWithProducts,
+      } as Order;
+    })
+  );
+
+  return ordersWithProducts;
+};
+
+/**
  * Get all orders (Admin)
  */
 export const getAllOrders = async (): Promise<Order[]> => {
@@ -126,6 +166,37 @@ export const getOrderById = async (orderId: string): Promise<Order | null> => {
   return {
     id: orderDoc.id,
     ...orderDoc.data(),
+  } as Order;
+};
+
+/**
+ * Get order by ID with populated product details
+ */
+export const getOrderByIdWithProducts = async (orderId: string): Promise<Order | null> => {
+  const db = getFirebaseFirestore();
+  const orderDoc = await getDoc(doc(db, COLLECTIONS.ORDERS, orderId));
+
+  if (!orderDoc.exists()) {
+    return null;
+  }
+
+  const data = orderDoc.data();
+
+  // Populate product details for each item
+  const itemsWithProducts = await Promise.all(
+    (data.items || []).map(async (item: any) => {
+      const product = await getProductById(item.productId);
+      return {
+        ...item,
+        product: product || undefined,
+      };
+    })
+  );
+
+  return {
+    id: orderDoc.id,
+    ...data,
+    items: itemsWithProducts,
   } as Order;
 };
 

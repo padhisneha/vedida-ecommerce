@@ -99,6 +99,7 @@ export enum SubscriptionFrequency {
 export enum SubscriptionStatus {
   ACTIVE = 'active',
   PAUSED = 'paused',
+  COMPLETED = 'completed',
   CANCELLED = 'cancelled',
 }
 

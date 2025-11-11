@@ -9,7 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import {
-  getOrderById,
+  getOrderByIdWithProducts,
   Order,
   OrderStatus,
   formatCurrency,
@@ -28,8 +28,16 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
 
   const loadOrder = async () => {
     try {
-      const data = await getOrderById(orderId);
+      const data = await getOrderByIdWithProducts(orderId); // Changed
       setOrder(data);
+      
+      if (data) {
+        console.log('✅ Loaded order with products:', {
+          orderId: data.id,
+          itemCount: data.items.length,
+          firstProduct: data.items[0]?.product?.name || 'NO PRODUCT',
+        });
+      }
     } catch (error) {
       console.error('Error loading order:', error);
       Alert.alert('Error', 'Failed to load order details');
