@@ -77,19 +77,14 @@ export const ProfileScreen = ({ navigation }: any) => {
 
         <TouchableOpacity
           style={styles.menuItem}
-          onPress={() => {
-            Alert.alert(
-              'Help & Support',
-              'Contact us:\n\nEmail: support@dairyfresh.com\nPhone: +91 9876543210\n\nWe are available 24/7 to help you!'
-            );
-          }}
+          onPress={() => navigation.navigate('HelpSupport')}
         >
           <Text style={styles.menuIcon}>❓</Text>
           <Text style={styles.menuText}>Help & Support</Text>
           <Text style={styles.menuArrow}>›</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
+        {/* <TouchableOpacity
           style={styles.menuItem}
           onPress={() => {
             Alert.alert(
@@ -101,7 +96,7 @@ export const ProfileScreen = ({ navigation }: any) => {
           <Text style={styles.menuIcon}>ℹ️</Text>
           <Text style={styles.menuText}>About</Text>
           <Text style={styles.menuArrow}>›</Text>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
       </View>
 
       {/* Logout Button */}
@@ -187,7 +182,7 @@ const styles = StyleSheet.create({
   },
   logoutButton: {
     backgroundColor: '#fff',
-    marginTop: 16,
+    marginTop: 35,
     marginHorizontal: 20,
     padding: 16,
     borderRadius: 12,

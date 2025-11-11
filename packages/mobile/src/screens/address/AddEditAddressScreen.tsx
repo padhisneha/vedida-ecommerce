@@ -100,7 +100,7 @@ export const AddEditAddressScreen = ({ route, navigation }: any) => {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
+      {/* <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={styles.backButton}>‹ Cancel</Text>
         </TouchableOpacity>
@@ -108,7 +108,7 @@ export const AddEditAddressScreen = ({ route, navigation }: any) => {
           {isEdit ? 'Edit Address' : 'Add Address'}
         </Text>
         <View style={styles.placeholder} />
-      </View>
+      </View> */}
 
       <ScrollView style={styles.scrollView}>
         <View style={styles.form}>

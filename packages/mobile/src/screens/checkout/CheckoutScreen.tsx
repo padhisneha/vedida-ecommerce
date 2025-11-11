@@ -18,12 +18,13 @@ import {
   OrderStatus,
   CartItem,
   dateToTimestamp,
+  TaxBreakdown,
 } from '@ecommerce/shared';
 
 type PaymentMethod = 'cod' | 'online';
 
 export const CheckoutScreen = ({ route, navigation }: any) => {
-  const { cartItems, total } = route.params;
+  const { cartItems, taxBreakdown, platformFee, deliveryFee, total } = route.params;
   const { user } = useAuthStore();
   const [selectedAddress, setSelectedAddress] = useState<UserAddress | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod');
@@ -278,14 +279,44 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
           <Text style={styles.sectionTitle}>💰 Price Details</Text>
           <View style={styles.priceCard}>
             <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>Subtotal</Text>
-              <Text style={styles.priceValue}>{formatCurrency(total)}</Text>
+              <Text style={styles.priceLabel}>Subtotal (excl. tax)</Text>
+              <Text style={styles.priceValue}>
+                {formatCurrency(taxBreakdown.subtotal)}
+              </Text>
             </View>
+            
+            {taxBreakdown.cgst > 0 && (
+              <View style={styles.priceRow}>
+                <Text style={styles.priceLabel}>CGST</Text>
+                <Text style={styles.priceValue}>
+                  {formatCurrency(taxBreakdown.cgst)}
+                </Text>
+              </View>
+            )}
+            
+            {taxBreakdown.sgst > 0 && (
+              <View style={styles.priceRow}>
+                <Text style={styles.priceLabel}>SGST</Text>
+                <Text style={styles.priceValue}>
+                  {formatCurrency(taxBreakdown.sgst)}
+                </Text>
+              </View>
+            )}
+            
+            <View style={styles.priceRow}>
+              <Text style={styles.priceLabel}>Platform Fee</Text>
+              <Text style={styles.priceValue}>{formatCurrency(platformFee)}</Text>
+            </View>
+            
             <View style={styles.priceRow}>
               <Text style={styles.priceLabel}>Delivery Charges</Text>
-              <Text style={styles.priceFree}>FREE</Text>
+              <Text style={styles.priceFree}>
+                {deliveryFee === 0 ? 'FREE' : formatCurrency(deliveryFee)}
+              </Text>
             </View>
+            
             <View style={styles.divider} />
+            
             <View style={styles.priceRow}>
               <Text style={styles.totalLabel}>Total Amount</Text>
               <Text style={styles.totalValue}>{formatCurrency(total)}</Text>

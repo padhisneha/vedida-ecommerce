@@ -72,7 +72,7 @@ export const SelectAddressScreen = ({ route, navigation }: any) => {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
+      {/* <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={styles.backButton}>‹ Back</Text>
         </TouchableOpacity>
@@ -80,7 +80,7 @@ export const SelectAddressScreen = ({ route, navigation }: any) => {
         <TouchableOpacity onPress={() => navigation.navigate('AddAddress')}>
           <Text style={styles.addNewText}>+ New</Text>
         </TouchableOpacity>
-      </View>
+      </View> */}
 
       {/* Address List */}
       <FlatList

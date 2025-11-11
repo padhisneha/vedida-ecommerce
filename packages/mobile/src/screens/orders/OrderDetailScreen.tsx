@@ -46,6 +46,34 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
     }
   };
 
+  // Add this after the order is loaded
+  const calculateOrderTaxBreakdown = () => {
+    if (!order) return { subtotal: 0, cgst: 0, sgst: 0, totalTax: 0 };
+    
+    let subtotal = 0;
+    let cgst = 0;
+    let sgst = 0;
+
+    order.items.forEach((item) => {
+      if (item.product) {
+        const itemSubtotal = item.product.priceExcludingTax * item.quantity;
+        const itemCGST = (itemSubtotal * item.product.taxCGST) / 100;
+        const itemSGST = (itemSubtotal * item.product.taxSGST) / 100;
+
+        subtotal += itemSubtotal;
+        cgst += itemCGST;
+        sgst += itemSGST;
+      }
+    });
+
+    return {
+      subtotal,
+      cgst,
+      sgst,
+      totalTax: cgst + sgst,
+    };
+  };
+
   const getStatusColor = (status: OrderStatus) => {
     switch (status) {
       case OrderStatus.DELIVERED:
@@ -126,13 +154,13 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
+      {/* <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={styles.backIcon}>‹</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Order Details</Text>
         <View style={styles.placeholder} />
-      </View>
+      </View> */}
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Status Card */}
@@ -290,22 +318,49 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
           <Text style={styles.sectionTitle}>💰 Payment Summary</Text>
           <View style={styles.summaryCard}>
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Subtotal</Text>
+              <Text style={styles.summaryLabel}>Subtotal (excl. tax)</Text>
               <Text style={styles.summaryValue}>
-                {formatCurrency(order.totalAmount)}
+                {formatCurrency(calculateOrderTaxBreakdown().subtotal)}
               </Text>
             </View>
+            
+            {calculateOrderTaxBreakdown().cgst > 0 && (
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>CGST</Text>
+                <Text style={styles.summaryValue}>
+                  {formatCurrency(calculateOrderTaxBreakdown().cgst)}
+                </Text>
+              </View>
+            )}
+            
+            {calculateOrderTaxBreakdown().sgst > 0 && (
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>SGST</Text>
+                <Text style={styles.summaryValue}>
+                  {formatCurrency(calculateOrderTaxBreakdown().sgst)}
+                </Text>
+              </View>
+            )}
+            
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Platform Fee</Text>
+              <Text style={styles.summaryValue}>{formatCurrency(5)}</Text>
+            </View>
+            
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Delivery Charges</Text>
               <Text style={styles.summaryFree}>FREE</Text>
             </View>
+            
             <View style={styles.divider} />
+            
             <View style={styles.summaryRow}>
               <Text style={styles.totalLabel}>Total Amount</Text>
               <Text style={styles.totalValue}>
                 {formatCurrency(order.totalAmount)}
               </Text>
             </View>
+            
             <View style={styles.paymentMethodCard}>
               <Text style={styles.paymentMethodText}>
                 💵 Payment Method: Cash on Delivery

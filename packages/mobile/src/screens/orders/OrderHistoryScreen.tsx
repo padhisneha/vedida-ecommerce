@@ -224,13 +224,13 @@ export const OrderHistoryScreen = ({ navigation }: any) => {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
+      {/* <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={styles.backButton}>‹</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Order History</Text>
         <View style={styles.placeholder} />
-      </View>
+      </View> */}
 
       {/* Tabs */}
       <View style={styles.tabsContainer}>

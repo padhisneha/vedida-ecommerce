@@ -59,7 +59,10 @@ export interface Product {
   name: string;
   description: string;
   category: ProductCategory;
-  price: number; // in rupees
+  priceExcludingTax: number; // Base price without tax
+  taxCGST: number; // CGST percentage (e.g., 2.5 for 2.5%)
+  taxSGST: number; // SGST percentage (e.g., 2.5 for 2.5%)
+  price: number; // Final price including tax (for display)
   unit: ProductUnit;
   quantity: number; // e.g., 500 for 500ml
   imageUrl?: string;

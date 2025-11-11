@@ -14,14 +14,16 @@
     "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.vedida.app"
+      "bundleIdentifier": "com.vedida.app",
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.vedida.app"
+      "package": "com.vedida.app",
+      "versionCode": 1
     },
     "web": {
       "favicon": "./assets/favicon.png"

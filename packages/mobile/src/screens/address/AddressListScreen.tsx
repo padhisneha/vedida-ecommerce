@@ -127,19 +127,8 @@ export const AddressListScreen = ({ navigation }: any) => {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backButton}>‹ Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>My Addresses</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('AddAddress')}>
-          <Text style={styles.addButton}>+ Add</Text>
-        </TouchableOpacity>
-      </View>
-
       {user.addresses.length === 0 ? (
-        <View style={styles.centerContainer}>
+        <View style={styles.emptyContainer}>
           <Text style={styles.emptyEmoji}>📍</Text>
           <Text style={styles.emptyTitle}>No Addresses</Text>
           <Text style={styles.emptySubtitle}>
@@ -149,17 +138,28 @@ export const AddressListScreen = ({ navigation }: any) => {
             style={styles.addAddressButton}
             onPress={() => navigation.navigate('AddAddress')}
           >
-            <Text style={styles.addAddressButtonText}>Add Address</Text>
+            <Text style={styles.addAddressButtonText}>+ Add Address</Text>
           </TouchableOpacity>
         </View>
       ) : (
-        <FlatList
-          data={user.addresses}
-          renderItem={renderAddress}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-        />
+        <>
+          <FlatList
+            data={user.addresses}
+            renderItem={renderAddress}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+          />
+
+          {/* Floating Add Button */}
+          <TouchableOpacity
+            style={styles.floatingAddButton}
+            onPress={() => navigation.navigate('AddAddress')}
+          >
+            <Text style={styles.floatingAddIcon}>+</Text>
+            <Text style={styles.floatingAddText}>Add New Address</Text>
+          </TouchableOpacity>
+        </>
       )}
     </View>
   );
@@ -176,33 +176,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
-  header: {
-    backgroundColor: '#fff',
-    padding: 20,
-    paddingTop: 60,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  backButton: {
-    fontSize: 16,
-    color: '#4CAF50',
-    fontWeight: '600',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-  },
-  addButton: {
-    fontSize: 16,
-    color: '#4CAF50',
-    fontWeight: '600',
-  },
   listContent: {
     padding: 16,
+    paddingBottom: 100, // Space for floating button
   },
   addressCard: {
     backgroundColor: '#fff',
@@ -286,6 +262,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
   emptyEmoji: {
     fontSize: 80,
     marginBottom: 16,
@@ -313,6 +295,34 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   addAddressButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  floatingAddButton: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
+    backgroundColor: '#4CAF50',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: '#4CAF50',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  floatingAddIcon: {
+    fontSize: 24,
+    color: '#fff',
+    fontWeight: 'bold',
+    marginRight: 8,
+  },
+  floatingAddText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',

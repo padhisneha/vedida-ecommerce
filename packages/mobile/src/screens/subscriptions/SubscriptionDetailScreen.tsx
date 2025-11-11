@@ -214,13 +214,13 @@ export const SubscriptionDetailScreen = ({ route, navigation }: any) => {
     return (
         <View style={styles.container}>
             {/* Header */}
-            <View style={styles.header}>
+            {/* <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()}>
                     <Text style={styles.backIcon}>‹</Text>
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Subscription Details</Text>
                 <View style={styles.placeholder} />
-            </View>
+            </View> */}
 
             <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
                 {/* Status Card */}

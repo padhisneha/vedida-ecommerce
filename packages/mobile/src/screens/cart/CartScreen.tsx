@@ -18,6 +18,10 @@ import {
   clearCart,
   formatCurrency,
   CartItem,
+  calculateCartTax,
+  calculateOrderTotal,
+  PLATFORM_FEE,
+  DELIVERY_FEE,
 } from '@ecommerce/shared';
 
 export const CartScreen = ({ navigation }: any) => {
@@ -140,12 +144,32 @@ export const CartScreen = ({ navigation }: any) => {
     }, 0);
   };
 
+  // Update the total calculation
+  const getTaxBreakdown = () => {
+    if (!cart || !cart.items) {
+      return {
+        subtotal: 0,
+        cgst: 0,
+        sgst: 0,
+        totalTax: 0,
+        totalBeforeFees: 0,
+      };
+    }
+    return calculateCartTax(cart.items);
+  };
+
   const handleCheckout = () => {
     if (!cart || cart.items.length === 0) return;
     
+    const taxBreakdown = getTaxBreakdown();
+    const total = calculateOrderTotal(taxBreakdown, PLATFORM_FEE, DELIVERY_FEE);
+    
     navigation.navigate('Checkout', { 
       cartItems: cart.items,
-      total: calculateTotal(),
+      taxBreakdown,
+      platformFee: PLATFORM_FEE,
+      deliveryFee: DELIVERY_FEE,
+      total,
     });
   };
 
@@ -288,17 +312,45 @@ export const CartScreen = ({ navigation }: any) => {
       <View style={styles.footer}>
         <View style={styles.totalContainer}>
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Subtotal</Text>
-            <Text style={styles.totalValue}>{formatCurrency(total)}</Text>
+            <Text style={styles.totalLabel}>Subtotal (excl. tax)</Text>
+            <Text style={styles.totalValue}>
+              {formatCurrency(getTaxBreakdown().subtotal)}
+            </Text>
+          </View>
+          {getTaxBreakdown().cgst > 0 && (
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>CGST</Text>
+              <Text style={styles.totalValue}>
+                {formatCurrency(getTaxBreakdown().cgst)}
+              </Text>
+            </View>
+          )}
+          {getTaxBreakdown().sgst > 0 && (
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>SGST</Text>
+              <Text style={styles.totalValue}>
+                {formatCurrency(getTaxBreakdown().sgst)}
+              </Text>
+            </View>
+          )}
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>Platform Fee</Text>
+            <Text style={styles.totalValue}>{formatCurrency(PLATFORM_FEE)}</Text>
           </View>
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Delivery Fee</Text>
-            <Text style={styles.deliveryFree}>FREE</Text>
+            <Text style={styles.deliveryFree}>
+              {DELIVERY_FEE === 0 ? 'FREE' : formatCurrency(DELIVERY_FEE)}
+            </Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.totalRow}>
             <Text style={styles.grandTotalLabel}>Total</Text>
-            <Text style={styles.grandTotalValue}>{formatCurrency(total)}</Text>
+            <Text style={styles.grandTotalValue}>
+              {formatCurrency(
+                calculateOrderTotal(getTaxBreakdown(), PLATFORM_FEE, DELIVERY_FEE)
+              )}
+            </Text>
           </View>
         </View>
 

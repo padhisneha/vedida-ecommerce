@@ -37,6 +37,9 @@ import { SelectAddressScreen } from '../screens/address/SelectAddressScreen';
 import { OrderHistoryScreen } from '../screens/orders/OrderHistoryScreen';
 import { OrderDetailScreen } from '../screens/orders/OrderDetailScreen';
 
+// Support Screen
+import { HelpSupportScreen } from '../screens/support/HelpSupportScreen';
+
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
@@ -89,12 +92,22 @@ const CartStack = () => {
       <Stack.Screen
         name="SelectAddress"
         component={SelectAddressScreen}
-        options={{ headerShown: false }}
+        options={{
+          title: 'Select Address',  // <-- Add navigation header
+          headerStyle: { backgroundColor: '#fff' },
+          headerTintColor: '#4CAF50',
+          headerTitleStyle: { fontWeight: '600' },
+        }}
       />
       <Stack.Screen
         name="AddAddress"
         component={AddEditAddressScreen}
-        options={{ headerShown: false }}
+        options={{
+          title: 'Add Address',  // <-- Use navigation header instead
+          headerStyle: { backgroundColor: '#fff' },
+          headerTintColor: '#4CAF50',
+          headerTitleStyle: { fontWeight: '600' },
+        }}
       />
     </Stack.Navigator>
   );
@@ -132,22 +145,42 @@ const SubscriptionsStack = () => {
       <Stack.Screen
         name="SubscriptionDetail"
         component={SubscriptionDetailScreen}
-        options={{ headerShown: false }}
+        options={{
+          title: 'Subscription Details',  // <-- Add navigation header
+          headerStyle: { backgroundColor: '#fff' },
+          headerTintColor: '#4CAF50',
+          headerTitleStyle: { fontWeight: '600' },
+        }}
       />
       <Stack.Screen
         name="PauseSubscription"
         component={PauseSubscriptionScreen}
-        options={{ headerShown: false }}
+        options={{
+          title: 'Pause Subscription',  // <-- Add navigation header
+          headerStyle: { backgroundColor: '#fff' },
+          headerTintColor: '#4CAF50',
+          headerTitleStyle: { fontWeight: '600' },
+        }}
       />
       <Stack.Screen
         name="SelectAddress"
         component={SelectAddressScreen}
-        options={{ headerShown: false }}
+        options={{
+          title: 'Select Address',  // <-- Add navigation header
+          headerStyle: { backgroundColor: '#fff' },
+          headerTintColor: '#4CAF50',
+          headerTitleStyle: { fontWeight: '600' },
+        }}
       />
       <Stack.Screen
         name="AddAddress"
         component={AddEditAddressScreen}
-        options={{ headerShown: false }}
+        options={{
+          title: 'Add Address',  // <-- Use navigation header instead
+          headerStyle: { backgroundColor: '#fff' },
+          headerTintColor: '#4CAF50',
+          headerTitleStyle: { fontWeight: '600' },
+        }}
       />
     </Stack.Navigator>
   );
@@ -165,32 +198,72 @@ const ProfileStack = () => {
       <Stack.Screen
         name="EditProfile"
         component={EditProfileScreen}
-        options={{ headerShown: false }}
+        options={{
+          title: 'Edit Profile',  // <-- Add navigation header
+          headerStyle: { backgroundColor: '#fff' },
+          headerTintColor: '#4CAF50',
+          headerTitleStyle: { fontWeight: '600' },
+        }}
       />
       <Stack.Screen
         name="AddressList"
         component={AddressListScreen}
-        options={{ headerShown: false }}
+        options={{
+          title: 'My Addresses',  // <-- Use navigation header instead
+          headerStyle: { backgroundColor: '#fff' },
+          headerTintColor: '#4CAF50',
+          headerTitleStyle: { fontWeight: '600' },
+        }}
       />
       <Stack.Screen
         name="AddAddress"
         component={AddEditAddressScreen}
-        options={{ headerShown: false }}
+        options={{
+          title: 'Add Address',  // <-- Use navigation header instead
+          headerStyle: { backgroundColor: '#fff' },
+          headerTintColor: '#4CAF50',
+          headerTitleStyle: { fontWeight: '600' },
+        }}
       />
       <Stack.Screen
         name="EditAddress"
         component={AddEditAddressScreen}
-        options={{ headerShown: false }}
+        options={{
+          title: 'Edit Address',  // <-- Use navigation header instead
+          headerStyle: { backgroundColor: '#fff' },
+          headerTintColor: '#4CAF50',
+          headerTitleStyle: { fontWeight: '600' },
+        }}
       />
       <Stack.Screen
         name="OrderHistory"
         component={OrderHistoryScreen}
-        options={{ headerShown: false }}
+        options={{
+          title: 'Order History',  // <-- Add navigation header
+          headerStyle: { backgroundColor: '#fff' },
+          headerTintColor: '#4CAF50',
+          headerTitleStyle: { fontWeight: '600' },
+        }}
       />
       <Stack.Screen
         name="OrderDetail"
         component={OrderDetailScreen}
-        options={{ headerShown: false }}
+        options={{
+          title: 'Order Detail',  // <-- Add navigation header
+          headerStyle: { backgroundColor: '#fff' },
+          headerTintColor: '#4CAF50',
+          headerTitleStyle: { fontWeight: '600' },
+        }}
+      />
+      <Stack.Screen
+        name="HelpSupport"
+        component={HelpSupportScreen}
+        options={{
+          title: 'Help & Support',  // <-- Add navigation header
+          headerStyle: { backgroundColor: '#fff' },
+          headerTintColor: '#4CAF50',
+          headerTitleStyle: { fontWeight: '600' },
+        }}
       />
     </Stack.Navigator>
   );

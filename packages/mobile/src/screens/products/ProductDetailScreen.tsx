@@ -144,6 +144,13 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
 
           <View style={styles.priceContainer}>
             <Text style={styles.price}>{formatCurrency(product.price)}</Text>
+
+            {(product.taxCGST > 0 || product.taxSGST > 0) && (
+                <Text style={styles.taxInfoText}>
+                  (Inclusive of {product.taxCGST + product.taxSGST}% GST)
+                </Text>
+            )}
+
             <Text style={styles.unit}>
               {product.quantity} {product.unit}
             </Text>
@@ -291,6 +298,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#4CAF50',
     marginRight: 8,
+  },
+  taxInfoText: {
+    fontSize: 12,
+    color: '#999',
+    fontStyle: 'italic',
   },
   unit: {
     fontSize: 14,

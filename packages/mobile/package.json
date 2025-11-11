@@ -19,6 +19,7 @@
     "@react-navigation/native": "^6.1.9",
     "@react-navigation/native-stack": "^6.9.17",
     "expo": "~54.0.22",
+    "expo-constants": "~15.4.6",
     "expo-firebase-recaptcha": "^2.3.1",
     "expo-status-bar": "~3.0.8",
     "firebase": "^10.14.1",
