@@ -112,13 +112,11 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
           [
             {
               text: 'View Orders',
-              onPress: () => navigation.navigate('ProfileTab', {
-                screen: 'OrderHistory',
-              }),
+              onPress: () => navigation.navigate('ProfileTab', { screen: 'OrderHistory' }),
             },
             {
               text: 'Continue Shopping',
-              onPress: () => navigation.navigate('HomeTab'),
+              onPress: () => navigation.navigate('HomeTab', { screen: 'HomeMain' }),
             },
           ]
         );
@@ -264,7 +262,7 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
         </View>
 
         {/* Delivery Info */}
-        <View style={styles.section}>
+        {/* <View style={styles.section}>
           <Text style={styles.sectionTitle}>🚚 Delivery Information</Text>
           <View style={styles.infoCard}>
             <Text style={styles.infoText}>📅 Estimated Delivery: Tomorrow at 7 AM</Text>
@@ -273,7 +271,7 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
               💰 Payment: {paymentMethod === 'cod' ? 'Cash on Delivery' : 'Online Payment'}
             </Text>
           </View>
-        </View>
+        </View> */}
 
         {/* Price Breakdown */}
         <View style={styles.section}>

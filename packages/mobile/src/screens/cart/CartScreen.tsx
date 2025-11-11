@@ -244,17 +244,17 @@ export const CartScreen = ({ navigation }: any) => {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Shopping Cart</Text>
+          <Text style={styles.headerTitle}>My Cart</Text>
         </View>
         <View style={styles.centerContainer}>
           <Text style={styles.emptyEmoji}>🛒</Text>
           <Text style={styles.emptyTitle}>Your cart is empty</Text>
-          <Text style={styles.emptySubtitle}>
+          {/* <Text style={styles.emptySubtitle}>
             Add some delicious dairy products!
-          </Text>
+          </Text> */}
           <TouchableOpacity
             style={styles.shopButton}
-            onPress={() => navigation.navigate('Home')}
+            onPress={() => navigation.navigate('HomeTab', { screen: 'HomeMain' })}
           >
             <Text style={styles.shopButtonText}>Start Shopping</Text>
           </TouchableOpacity>
@@ -269,7 +269,7 @@ export const CartScreen = ({ navigation }: any) => {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Shopping Cart</Text>
+        <Text style={styles.headerTitle}>My Cart</Text>
         <TouchableOpacity onPress={handleClearCart}>
           <Text style={styles.clearText}>Clear All</Text>
         </TouchableOpacity>

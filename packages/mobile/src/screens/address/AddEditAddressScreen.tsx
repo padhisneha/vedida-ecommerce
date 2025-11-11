@@ -153,7 +153,7 @@ export const AddEditAddressScreen = ({ route, navigation }: any) => {
             <Text style={styles.label}>City *</Text>
             <TextInput
               style={styles.input}
-              placeholder="e.g., Bangalore"
+              placeholder="e.g., Hyderabad"
               value={city}
               onChangeText={setCity}
               autoCapitalize="words"
@@ -165,7 +165,7 @@ export const AddEditAddressScreen = ({ route, navigation }: any) => {
             <Text style={styles.label}>State *</Text>
             <TextInput
               style={styles.input}
-              placeholder="e.g., Karnataka"
+              placeholder="e.g., Telangana"
               value={state}
               onChangeText={setState}
               autoCapitalize="words"
@@ -177,7 +177,7 @@ export const AddEditAddressScreen = ({ route, navigation }: any) => {
             <Text style={styles.label}>Pincode *</Text>
             <TextInput
               style={styles.input}
-              placeholder="e.g., 560001"
+              placeholder="e.g., 500050"
               value={pincode}
               onChangeText={setPincode}
               keyboardType="number-pad"

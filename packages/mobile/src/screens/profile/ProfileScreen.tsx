@@ -93,8 +93,8 @@ export const ProfileScreen = ({ navigation }: any) => {
           style={styles.menuItem}
           onPress={() => {
             Alert.alert(
-              'About Dairy Fresh',
-              'Version 1.0.0\n\nDelivering fresh dairy products to your doorstep.\n\n© 2025 Dairy Fresh'
+              'About Vedida Farms',
+              'Version 1.0.0\n\nDelivering fresh farm products to your doorstep.\n\n© 2025 Vedida Farms Pvt. Ltd.'
             );
           }}
         >

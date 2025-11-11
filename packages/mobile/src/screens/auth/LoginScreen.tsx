@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import {
   View,
+  Image,
   Text,
   TextInput,
   TouchableOpacity,
@@ -19,8 +20,8 @@ import {
 import { firebaseConfig } from '../../config/firebase';
 
 export const LoginScreen = () => {
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [otp, setOtp] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('9999999999'); // Default for testing
+  const [otp, setOtp] = useState('123456'); // Default for testing
   const [verificationId, setVerificationId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const { setUser } = useAuthStore();
@@ -28,6 +29,7 @@ export const LoginScreen = () => {
 
   const sendOTP = async () => {
     if (!phoneNumber || phoneNumber.length !== 10) {
+      //Alert.alert('Error', "{phoneNumber.length}");
       Alert.alert('Error', 'Please enter a valid 10-digit phone number');
       return;
     }
@@ -49,7 +51,7 @@ export const LoginScreen = () => {
       );
 
       setVerificationId(verificationId);
-      Alert.alert('Success', 'OTP sent successfully to your phone!');
+      //Alert.alert('Success', 'OTP sent successfully to your phone!');
       console.log('✅ OTP sent, Verification ID:', verificationId);
     } catch (error: any) {
       console.error('❌ OTP send error:', error);
@@ -111,7 +113,7 @@ export const LoginScreen = () => {
       }
 
       setUser(user);
-      Alert.alert('Success', 'Welcome to Dairy Fresh!');
+      //Alert.alert('Success', 'Welcome to Dairy Fresh!');
     } catch (error: any) {
       console.error('❌ OTP verification error:', error);
       
@@ -146,11 +148,15 @@ export const LoginScreen = () => {
 
       <View style={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.emoji}>🥛</Text>
-          <Text style={styles.title}>Dairy Fresh</Text>
+          <Image
+            source={require('../../../assets/logo.png')}
+            style={{ width: 300, height: 300, marginBottom: 5 }}
+            resizeMode="contain"
+          />
+          <Text style={styles.title}>Vedida Farms</Text>
           <Text style={styles.subtitle}>
             {verificationId
-              ? 'Enter the OTP sent to your phone'
+              ? `Enter the OTP sent to your phone +91 ${phoneNumber}`
               : 'Login with your phone number'}
           </Text>
         </View>
@@ -167,7 +173,7 @@ export const LoginScreen = () => {
                 value={phoneNumber}
                 onChangeText={(text) => setPhoneNumber(text.replace(/[^0-9]/g, ''))}
                 editable={!loading}
-                autoFocus
+                //autoFocus
               />
             </View>
 
@@ -185,16 +191,16 @@ export const LoginScreen = () => {
 
             <View style={styles.infoBox}>
               <Text style={styles.infoText}>
-                📱 You will receive a one-time password on your mobile number
+                You will receive a one-time password on your mobile number
               </Text>
             </View>
           </>
         ) : (
           <>
-            <View style={styles.phoneDisplay}>
+            {/* <View style={styles.phoneDisplay}>
               <Text style={styles.phoneLabel}>OTP sent to</Text>
               <Text style={styles.phoneNumber}>+91 {phoneNumber}</Text>
-            </View>
+            </View> */}
 
             <TextInput
               style={styles.otpInput}
@@ -204,7 +210,7 @@ export const LoginScreen = () => {
               value={otp}
               onChangeText={(text) => setOtp(text.replace(/[^0-9]/g, ''))}
               editable={!loading}
-              autoFocus
+              //autoFocus
             />
 
             <TouchableOpacity
@@ -242,7 +248,7 @@ export const LoginScreen = () => {
 
       <View style={styles.footer}>
         <Text style={styles.footerText}>
-          By continuing, you agree to our Terms of Service and Privacy Policy
+          {/* By continuing, you agree to our Terms of Service and Privacy Policy */}
         </Text>
       </View>
     </View>
@@ -324,12 +330,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 16,
     height: 64,
-    fontSize: 24,
-    letterSpacing: 8,
+    fontSize: 20,
+    letterSpacing: 2,
     textAlign: 'center',
     marginBottom: 16,
     backgroundColor: '#fafafa',
-    fontWeight: '600',
+    fontWeight: '400',
   },
   button: {
     backgroundColor: '#4CAF50',
@@ -386,7 +392,7 @@ const styles = StyleSheet.create({
   },
   changeNumberText: {
     fontSize: 14,
-    color: '#666',
+    color: '#4CAF50',
     textAlign: 'center',
   },
   footer: {

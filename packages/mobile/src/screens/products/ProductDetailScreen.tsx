@@ -58,9 +58,21 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
       const updatedCart = await getCartWithProducts(user.id);
       setCart(updatedCart);
 
-      Alert.alert('Success', `${quantity} item(s) added to cart!`, [
-        { text: 'Continue Shopping', style: 'cancel' },
-      ]);
+      Alert.alert(
+        'Success',
+        `${quantity} item(s) added to cart!`,
+        [
+          {
+            text: 'Continue Shopping',
+            onPress: () => navigation.navigate('HomeTab', { screen: 'HomeMain' }),
+          },
+          {
+            text: 'View Cart',
+            onPress: () => navigation.navigate('CartTab', { screen: 'CartMain' }),
+          },
+        ]
+      );
+
     } catch (error: any) {
       console.error('Error adding to cart:', error);
       Alert.alert('Error', error.message || 'Failed to add to cart');
@@ -133,7 +145,7 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
           <View style={styles.priceContainer}>
             <Text style={styles.price}>{formatCurrency(product.price)}</Text>
             <Text style={styles.unit}>
-              per {product.quantity} {product.unit}
+              {product.quantity} {product.unit}
             </Text>
           </View>
 
@@ -272,6 +284,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'baseline',
     marginBottom: 16,
+    justifyContent: 'space-between',
   },
   price: {
     fontSize: 32,

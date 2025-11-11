@@ -91,7 +91,7 @@ export const HomeScreen = ({ navigation }: any) => {
         <View style={styles.productFooter}>
           <Text style={styles.productPrice}>{formatCurrency(item.price)}</Text>
           <Text style={styles.productUnit}>
-            per {item.quantity} {item.unit}
+            {item.quantity} {item.unit}
           </Text>
         </View>
       </View>
@@ -109,8 +109,8 @@ export const HomeScreen = ({ navigation }: any) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Fresh Dairy Products</Text>
-        <Text style={styles.headerSubtitle}>Delivered to your doorstep</Text>
+        <Text style={styles.headerTitle}>Vedida Farm Products</Text>
+        <Text style={styles.headerSubtitle}>Fresh to your doorstep</Text>
 
         {/* Search Bar */}
         <View style={styles.searchContainer}>
