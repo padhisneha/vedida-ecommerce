@@ -59,20 +59,12 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
       setCart(updatedCart);
 
       Alert.alert(
-        'Success',
-        `${quantity} item(s) added to cart!`,
-        [
-          {
-            text: 'Continue Shopping',
-            onPress: () => navigation.navigate('HomeTab', { screen: 'HomeMain' }),
-          },
-          {
-            text: 'View Cart',
-            onPress: () => navigation.navigate('CartTab', { screen: 'CartMain' }),
-          },
-        ]
+        '✅ Added to Cart',
+        `${quantity} × ${product?.name} added to your cart successfully!`
       );
-
+      
+      // Reset quantity to 1
+      setQuantity(1);
     } catch (error: any) {
       console.error('Error adding to cart:', error);
       Alert.alert('Error', error.message || 'Failed to add to cart');
@@ -115,7 +107,7 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
 
   return (
     <View style={styles.container}>
-      <ScrollView style={styles.scrollView}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Product Image */}
         <View style={styles.imageContainer}>
           {product.imageUrl ? (
@@ -127,47 +119,21 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
           )}
         </View>
 
-        {/* Product Info */}
+        {/* Product Info Container */}
         <View style={styles.contentContainer}>
-          <View style={styles.header}>
-            <Text style={styles.productName}>{product.name}</Text>
-            {!product.inStock && (
-              <View style={styles.outOfStockBadge}>
-                <Text style={styles.outOfStockText}>Out of Stock</Text>
-              </View>
-            )}
-          </View>
-
-          <Text style={styles.category}>{product.category.toUpperCase()}</Text>
-
-          <Text style={styles.description}>{product.description}</Text>
-
-          <View style={styles.priceContainer}>
-            <Text style={styles.price}>{formatCurrency(product.price)}</Text>
-
-            {(product.taxCGST > 0 || product.taxSGST > 0) && (
-                <Text style={styles.taxInfoText}>
-                  (Inclusive of {product.taxCGST + product.taxSGST}% GST)
-                </Text>
-            )}
-
-            <Text style={styles.unit}>
-              {product.quantity} {product.unit}
-            </Text>
-          </View>
-
-          {product.allowSubscription && (
-            <View style={styles.subscriptionBadge}>
-              <Text style={styles.subscriptionText}>
-                📅 Available for subscription
-              </Text>
+          {/* Header Row: Name and Quantity Selector */}
+          <View style={styles.headerRow}>
+            <View style={styles.nameContainer}>
+              <Text style={styles.productName}>{product.name}</Text>
+              {!product.inStock && (
+                <View style={styles.outOfStockBadge}>
+                  <Text style={styles.outOfStockText}>Out of Stock</Text>
+                </View>
+              )}
             </View>
-          )}
 
-          {/* Quantity Selector */}
-          <View style={styles.quantitySection}>
-            <Text style={styles.quantityLabel}>Quantity</Text>
-            <View style={styles.quantitySelector}>
+            {/* Quantity Selector - Top Right */}
+            <View style={styles.quantitySelectorTop}>
               <TouchableOpacity
                 style={styles.quantityButton}
                 onPress={decrementQuantity}
@@ -184,13 +150,54 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
               </TouchableOpacity>
             </View>
           </View>
+
+          {/* Category */}
+          <Text style={styles.category}>{product.category.toUpperCase()}</Text>
+
+          {/* Price */}
+          <View style={styles.priceContainer}>
+            <Text style={styles.price}>{formatCurrency(product.price)}</Text>
+            <Text style={styles.unit}>
+              per {product.quantity} {product.unit}
+            </Text>
+          </View>
+
+          {/* Tax Information */}
+          {(product.taxCGST > 0 || product.taxSGST > 0) && (
+            <View style={styles.taxInfo}>
+              <Text style={styles.taxInfoText}>
+                (Inclusive of {product.taxCGST + product.taxSGST}% GST)
+              </Text>
+            </View>
+          )}
+
+          {/* Subscription Badge */}
+          {product.allowSubscription && (
+            <View style={styles.subscriptionBadge}>
+              <Text style={styles.subscriptionText}>
+                📅 Available for subscription
+              </Text>
+            </View>
+          )}
+
+          {/* Divider */}
+          <View style={styles.divider} />
+
+          {/* Description - Moved to bottom */}
+          <View style={styles.descriptionSection}>
+            <Text style={styles.descriptionTitle}>About this product</Text>
+            <Text style={styles.description}>{product.description}</Text>
+          </View>
         </View>
       </ScrollView>
 
       {/* Add to Cart Button */}
       <View style={styles.footer}>
         <View style={styles.footerInfo}>
-          <Text style={styles.footerLabel}>Total</Text>
+          <View>
+            <Text style={styles.footerLabel}>Total</Text>
+            <Text style={styles.footerQuantity}>{quantity} item(s)</Text>
+          </View>
           <Text style={styles.footerPrice}>
             {formatCurrency(product.price * quantity)}
           </Text>
@@ -251,47 +258,75 @@ const styles = StyleSheet.create({
   contentContainer: {
     padding: 20,
   },
-  header: {
+  headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    marginBottom: 12,
+  },
+  nameContainer: {
+    flex: 1,
+    marginRight: 12,
   },
   productName: {
-    flex: 1,
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#1a1a1a',
+    marginBottom: 8,
   },
   outOfStockBadge: {
     backgroundColor: '#ffebee',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
+    alignSelf: 'flex-start',
   },
   outOfStockText: {
     color: '#c62828',
     fontSize: 12,
     fontWeight: '600',
   },
+  quantitySelectorTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 12,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  quantityButton: {
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+  },
+  quantityButtonText: {
+    fontSize: 20,
+    color: '#4CAF50',
+    fontWeight: '600',
+  },
+  quantityValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    marginHorizontal: 16,
+    minWidth: 30,
+    textAlign: 'center',
+  },
   category: {
     fontSize: 14,
     color: '#4CAF50',
     fontWeight: '600',
-    marginBottom: 16,
+    marginBottom: 12,
     letterSpacing: 0.5,
-  },
-  description: {
-    fontSize: 16,
-    color: '#666',
-    lineHeight: 24,
-    marginBottom: 20,
   },
   priceContainer: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    marginBottom: 16,
-    justifyContent: 'space-between',
+    marginBottom: 8,
   },
   price: {
     fontSize: 32,
@@ -299,63 +334,47 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
     marginRight: 8,
   },
+  unit: {
+    fontSize: 14,
+    color: '#999',
+  },
+  taxInfo: {
+    marginBottom: 16,
+  },
   taxInfoText: {
     fontSize: 12,
     color: '#999',
     fontStyle: 'italic',
   },
-  unit: {
-    fontSize: 14,
-    color: '#999',
-  },
   subscriptionBadge: {
     backgroundColor: '#e8f5e9',
     padding: 12,
     borderRadius: 8,
-    marginBottom: 24,
+    marginBottom: 16,
   },
   subscriptionText: {
     color: '#2e7d32',
     fontSize: 14,
     fontWeight: '500',
   },
-  quantitySection: {
-    marginBottom: 24,
+  divider: {
+    height: 1,
+    backgroundColor: '#e0e0e0',
+    marginVertical: 16,
   },
-  quantityLabel: {
+  descriptionSection: {
+    marginBottom: 16,
+  },
+  descriptionTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1a1a1a',
-    marginBottom: 12,
+    marginBottom: 8,
   },
-  quantitySelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    borderRadius: 12,
-    padding: 4,
-    alignSelf: 'flex-start',
-  },
-  quantityButton: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 10,
-  },
-  quantityButtonText: {
-    fontSize: 24,
-    color: '#4CAF50',
-    fontWeight: '600',
-  },
-  quantityValue: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginHorizontal: 24,
-    minWidth: 30,
-    textAlign: 'center',
+  description: {
+    fontSize: 15,
+    color: '#666',
+    lineHeight: 24,
   },
   footer: {
     borderTopWidth: 1,
@@ -371,11 +390,16 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   footerLabel: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#666',
+    marginBottom: 2,
+  },
+  footerQuantity: {
+    fontSize: 12,
+    color: '#999',
   },
   footerPrice: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#1a1a1a',
   },

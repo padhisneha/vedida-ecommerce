@@ -25,7 +25,7 @@ export const PauseSubscriptionScreen = ({ route, navigation }: any) => {
 
   // Default resume date: 7 days from pause start
   const defaultResumeDate = new Date(pauseStartDate);
-  defaultResumeDate.setDate(defaultResumeDate.getDate() + 7);
+  defaultResumeDate.setDate(defaultResumeDate.getDate() + 1);
 
   const [resumeDate, setResumeDate] = useState<Date>(defaultResumeDate);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -80,7 +80,7 @@ export const PauseSubscriptionScreen = ({ route, navigation }: any) => {
                 [
                   {
                     text: 'OK',
-                    onPress: () => navigation.goBack(),
+                    onPress: () => navigation.navigate('SubscriptionsTab', { screen: 'SubscriptionsList'}),
                   },
                 ]
               );
@@ -111,21 +111,22 @@ export const PauseSubscriptionScreen = ({ route, navigation }: any) => {
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Info Card */}
-        <View style={styles.infoCard}>
+        {/* <View style={styles.infoCard}>
           <Text style={styles.infoIcon}>⏸️</Text>
           <Text style={styles.infoTitle}>Temporarily Pause Deliveries</Text>
           <Text style={styles.infoSubtitle}>
             Your subscription will automatically resume on the date you choose
           </Text>
-        </View>
+        </View> */}
 
         {/* Pause Details */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📅 Pause Schedule</Text>
+          {/* <Text style={styles.sectionTitle}>Temporarily Pause Deliveries</Text> */}
 
           {/* Pause Start Date (Read-only) */}
+          <Text style={styles.dateLabel}>Pause From</Text>
           <View style={styles.dateInfoCard}>
-            <Text style={styles.dateInfoLabel}>Pause From</Text>
+            {/* <Text style={styles.dateInfoLabel}>Pause From</Text> */}
             <View style={styles.dateInfoValue}>
               <Text style={styles.dateInfoIcon}>📅</Text>
               <Text style={styles.dateInfoText}>
@@ -137,9 +138,9 @@ export const PauseSubscriptionScreen = ({ route, navigation }: any) => {
                 })}
               </Text>
             </View>
-            <Text style={styles.dateInfoSubtext}>
+            {/* <Text style={styles.dateInfoSubtext}>
               (Tomorrow - Deliveries will stop from this date)
-            </Text>
+            </Text> */}
           </View>
 
           {/* Resume Date (Selectable) */}

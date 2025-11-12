@@ -108,8 +108,8 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
       // Show success based on payment method
       if (paymentMethod === 'cod') {
         Alert.alert(
-          'Order Placed Successfully! 🎉',
-          `Your order will be delivered tomorrow at 7 AM.\n\nOrder ID: ${orderId.slice(0, 8)}\nPayment: Cash on Delivery`,
+          'Order Placed Successfully!',
+          `Order ID: ${orderId.slice(0, 8)}`,
           [
             {
               text: 'View Orders',

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,11 +6,34 @@ import {
   FlatList,
   TouchableOpacity,
 } from 'react-native';
-import { useAuthStore, UserAddress } from '@ecommerce/shared';
+import { useAuthStore, UserAddress, getUserById } from '@ecommerce/shared';
 
 export const SelectAddressScreen = ({ route, navigation }: any) => {
   const { currentAddressId, onSelect } = route.params;
-  const { user } = useAuthStore();
+  const { user, setUser } = useAuthStore();
+
+  // Refresh addresses when screen comes into focus
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      refreshUserData();
+    });
+
+    return unsubscribe;
+  }, [navigation, user]);
+
+  const refreshUserData = async () => {
+    if (!user) return;
+
+    try {
+      const updatedUser = await getUserById(user.id);
+      if (updatedUser) {
+        setUser(updatedUser);
+        console.log('✅ Addresses refreshed in SelectAddress');
+      }
+    } catch (error) {
+      console.error('Error refreshing user data:', error);
+    }
+  };
 
   const handleSelectAddress = (address: UserAddress) => {
     onSelect(address);

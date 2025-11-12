@@ -9,6 +9,18 @@ export const PLATFORM_FEE = 5;
 export const DELIVERY_FEE = 0;
 
 /**
+ * Razorpay configuration
+ * Get your keys from: https://dashboard.razorpay.com/app/keys
+ */
+export const RAZORPAY_CONFIG = {
+  keyId: process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_xxxxxxxxxx',
+  keySecret: process.env.EXPO_PUBLIC_RAZORPAY_KEY_SECRET || '', // Keep secret, don't expose in app
+  businessName: 'Vedida Farms',
+  businessLogo: 'https://your-logo-url.com/logo.png', // Optional
+  themeColor: '#4CAF50',
+};
+
+/**
  * Support contact details
  */
 export const SUPPORT_CONTACT = {

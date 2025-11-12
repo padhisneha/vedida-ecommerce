@@ -165,7 +165,7 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Status Card */}
         <View style={styles.statusCard}>
-          <Text style={styles.statusIcon}>{statusIcon}</Text>
+          {/* <Text style={styles.statusIcon}>{statusIcon}</Text> */}
           <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
             <Text style={styles.statusText}>{getStatusText(order.status)}</Text>
           </View>
@@ -371,8 +371,8 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
 
         {/* Help Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>❓ Need Help?</Text>
-          <TouchableOpacity style={styles.helpButton}>
+          <Text style={styles.sectionTitle}>Need Help?</Text>
+          <TouchableOpacity style={styles.helpButton} onPress={() => navigation.navigate('HelpSupport')}>
             <Text style={styles.helpButtonText}>Contact Support</Text>
           </TouchableOpacity>
         </View>

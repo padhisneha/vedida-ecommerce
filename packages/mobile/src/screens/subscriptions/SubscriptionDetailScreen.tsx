@@ -142,7 +142,8 @@ export const SubscriptionDetailScreen = ({ route, navigation }: any) => {
                         try {
                             await updateSubscriptionStatus(subscriptionId, SubscriptionStatus.ACTIVE);
                             Alert.alert('Success', 'Subscription resumed successfully');
-                            await loadSubscription();
+                            //await loadSubscription();
+                            navigation.navigate('SubscriptionsTab', { screen: 'SubscriptionsList'})
                         } catch (error) {
                             console.error('Error resuming subscription:', error);
                             Alert.alert('Error', 'Failed to resume subscription');

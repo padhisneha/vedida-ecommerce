@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,10 +12,34 @@ import {
   UserAddress,
   deleteUserAddress,
   updateUserProfile,
+  getUserById,
 } from '@ecommerce/shared';
 
 export const AddressListScreen = ({ navigation }: any) => {
   const { user, setUser } = useAuthStore();
+
+  // Add useEffect to refresh when screen comes into focus
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      refreshUserData();
+    });
+
+    return unsubscribe;
+  }, [navigation, user]);
+
+  const refreshUserData = async () => {
+    if (!user) return;
+
+    try {
+      const updatedUser = await getUserById(user.id);
+      if (updatedUser) {
+        setUser(updatedUser);
+        console.log('✅ Addresses refreshed:', updatedUser.addresses.length);
+      }
+    } catch (error) {
+      console.error('Error refreshing user data:', error);
+    }
+  };
 
   const handleSetDefault = async (addressId: string) => {
     if (!user) return;
@@ -28,8 +52,8 @@ export const AddressListScreen = ({ navigation }: any) => {
 
       await updateUserProfile(user.id, { addresses: updatedAddresses });
 
-      // Update local state
-      setUser({ ...user, addresses: updatedAddresses });
+      // Refresh user data
+      await refreshUserData();
 
       Alert.alert('Success', 'Default address updated');
     } catch (error) {
@@ -53,11 +77,8 @@ export const AddressListScreen = ({ navigation }: any) => {
             try {
               await deleteUserAddress(user.id, addressId);
               
-              // Update local state
-              const updatedAddresses = user.addresses.filter(
-                (addr) => addr.id !== addressId
-              );
-              setUser({ ...user, addresses: updatedAddresses });
+              // Refresh user data
+              await refreshUserData();
 
               Alert.alert('Success', 'Address deleted');
             } catch (error) {

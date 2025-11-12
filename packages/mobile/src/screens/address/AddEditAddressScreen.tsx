@@ -15,6 +15,7 @@ import {
   addUserAddress,
   updateUserAddress,
   UserAddress,
+  getUserById,
 } from '@ecommerce/shared';
 
 export const AddEditAddressScreen = ({ route, navigation }: any) => {
@@ -86,8 +87,14 @@ export const AddEditAddressScreen = ({ route, navigation }: any) => {
         Alert.alert('Success', 'Address added successfully');
       }
 
-      // Refresh user data (in a real app, you'd fetch from Firestore)
-      // For now, navigate back
+      // Refresh user data from Firestore
+      const updatedUser = await getUserById(user.id);
+      if (updatedUser) {
+        setUser(updatedUser);
+        console.log('✅ User data refreshed after address save');
+      }
+
+      // Navigate back
       navigation.goBack();
     } catch (error) {
       console.error('Error saving address:', error);
