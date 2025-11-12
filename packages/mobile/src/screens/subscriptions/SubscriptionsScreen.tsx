@@ -245,12 +245,12 @@ export const SubscriptionsScreen = ({ navigation }: any) => {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>My Subscriptions</Text>
-        <TouchableOpacity
+        {/* <TouchableOpacity
           style={styles.addButton}
           onPress={() => navigation.navigate('CreateSubscription')}
         >
           <Text style={styles.addButtonText}>+ New</Text>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
       </View>
 
       {/* Tabs */}
@@ -307,18 +307,31 @@ export const SubscriptionsScreen = ({ navigation }: any) => {
               style={styles.createButton}
               onPress={() => navigation.navigate('CreateSubscription')}
             >
-              <Text style={styles.createButtonText}>Create Subscription</Text>
+              <Text style={styles.createButtonText}>+ Create Subscription</Text>
             </TouchableOpacity>
           )}
         </View>
       ) : (
-        <FlatList
-          data={filteredSubscriptions}
-          renderItem={renderSubscription}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-        />
+        <>
+          <FlatList
+            data={filteredSubscriptions}
+            renderItem={renderSubscription}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+          />
+
+          {/* Floating Add Button - Only show on Active tab */}
+          {activeTab === 'active' && (
+            <TouchableOpacity
+              style={styles.floatingAddButton}
+              onPress={() => navigation.navigate('CreateSubscription')}
+            >
+              <Text style={styles.floatingAddIcon}>+</Text>
+              <Text style={styles.floatingAddText}>New Subscription</Text>
+            </TouchableOpacity>
+          )}
+        </>
       )}
     </View>
   );
@@ -541,6 +554,34 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   createButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  floatingAddButton: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
+    backgroundColor: '#4CAF50',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: '#4CAF50',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  floatingAddIcon: {
+    fontSize: 24,
+    color: '#fff',
+    fontWeight: 'bold',
+    marginRight: 8,
+  },
+  floatingAddText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',

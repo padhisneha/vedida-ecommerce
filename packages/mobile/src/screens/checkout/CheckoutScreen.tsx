@@ -8,6 +8,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import RazorpayCheckout from 'react-native-razorpay';
 import {
   useAuthStore,
   formatCurrency,
@@ -19,6 +20,7 @@ import {
   CartItem,
   dateToTimestamp,
   TaxBreakdown,
+  RAZORPAY_CONFIG,
 } from '@ecommerce/shared';
 
 type PaymentMethod = 'cod' | 'online';
@@ -65,6 +67,86 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
     });
   };
 
+  const createOrderInDatabase = async () => {
+    if (!user || !selectedAddress) {
+      throw new Error('User or address not available');
+    }
+
+    // Prepare order items
+    const orderItems = cartItems.map((item: CartItem) => ({
+      productId: item.productId,
+      quantity: item.quantity,
+      price: item.product?.price || 0,
+    }));
+
+    // Calculate delivery date (next day)
+    const deliveryDate = new Date();
+    deliveryDate.setDate(deliveryDate.getDate() + 1);
+    deliveryDate.setHours(7, 0, 0, 0); // 7 AM delivery
+
+    // Create order
+    const orderId = await createOrder({
+      userId: user.id,
+      type: OrderType.ONE_TIME,
+      items: orderItems,
+      totalAmount: total,
+      deliveryAddress: selectedAddress,
+      status: OrderStatus.PENDING,
+      scheduledDeliveryDate: dateToTimestamp(deliveryDate),
+    });
+
+    return orderId;
+  };
+
+  const handleRazorpayPayment = async (): Promise<{
+    success: boolean;
+    paymentId: string;
+    orderId?: string;
+    signature?: string;
+  }> => {
+    if (!user || !selectedAddress) {
+      throw new Error('User or address not available');
+    }
+
+    const options = {
+      description: 'Dairy Fresh Order',
+      image: RAZORPAY_CONFIG.businessLogo,
+      currency: 'INR',
+      key: RAZORPAY_CONFIG.keyId,
+      amount: Math.round(total * 100), // Amount in paise (₹1 = 100 paise)
+      name: RAZORPAY_CONFIG.businessName,
+      prefill: {
+        email: user.email || '',
+        contact: user.phoneNumber || '',
+        name: user.name || '',
+      },
+      theme: { color: RAZORPAY_CONFIG.themeColor },
+    };
+
+    try {
+      const data = await RazorpayCheckout.open(options);
+      
+      // Payment successful
+      console.log('✅ Payment Success:', data);
+      
+      return {
+        success: true,
+        paymentId: data.razorpay_payment_id,
+        orderId: data.razorpay_order_id,
+        signature: data.razorpay_signature,
+      };
+    } catch (error: any) {
+      console.log('❌ Payment Error:', error);
+      
+      // User cancelled or payment failed
+      if (error.code === RazorpayCheckout.PAYMENT_CANCELLED) {
+        throw new Error('Payment cancelled by user');
+      } else {
+        throw new Error(error.description || 'Payment failed');
+      }
+    }
+  };
+
   const handlePlaceOrder = async () => {
     if (!user) {
       Alert.alert('Error', 'Please login to place an order');
@@ -79,56 +161,66 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
 
     setLoading(true);
     try {
-      // Prepare order items
-      const orderItems = cartItems.map((item: CartItem) => ({
-        productId: item.productId,
-        quantity: item.quantity,
-        price: item.product?.price || 0,
-      }));
+      let orderId: string;
 
-      // Calculate delivery date (next day)
-      const deliveryDate = new Date();
-      deliveryDate.setDate(deliveryDate.getDate() + 1);
-      deliveryDate.setHours(7, 0, 0, 0); // 7 AM delivery
+      if (paymentMethod === 'online') {
+        // Process online payment first
+        try {
+          const paymentResult = await handleRazorpayPayment();
+          
+          // Create order after successful payment
+          orderId = await createOrderInDatabase();
+          
+          // Store payment details
+          console.log('Payment ID:', paymentResult.paymentId);
+          
+          // Clear cart
+          await clearCart(user.id);
 
-      // Create order
-      const orderId = await createOrder({
-        userId: user.id,
-        type: OrderType.ONE_TIME,
-        items: orderItems,
-        totalAmount: total,
-        deliveryAddress: selectedAddress,
-        status: OrderStatus.PENDING,
-        scheduledDeliveryDate: dateToTimestamp(deliveryDate),
-      });
+          Alert.alert(
+            'Payment Successful! 🎉',
+            `Your order has been placed successfully.\n\nOrder ID: ${orderId.slice(0, 8)}\nPayment ID: ${paymentResult.paymentId.slice(0, 12)}...\n\nDelivery: Tomorrow at 7 AM`,
+            [
+              {
+                text: 'View Orders',
+                onPress: () => navigation.navigate('ProfileTab', {
+                  screen: 'OrderHistory',
+                }),
+              },
+              {
+                text: 'Continue Shopping',
+                onPress: () => navigation.navigate('HomeTab'),
+              },
+            ]
+          );
+        } catch (paymentError: any) {
+          // Payment failed or cancelled
+          Alert.alert(
+            'Payment Failed',
+            paymentError.message || 'Unable to process payment. Please try again.'
+          );
+          setLoading(false);
+          return;
+        }
+      } else {
+        // Cash on Delivery
+        orderId = await createOrderInDatabase();
+        
+        // Clear cart after successful order
+        await clearCart(user.id);
 
-      // Clear cart after successful order
-      await clearCart(user.id);
-
-      // Show success based on payment method
-      if (paymentMethod === 'cod') {
         Alert.alert(
-          'Order Placed Successfully!',
-          `Order ID: ${orderId.slice(0, 8)}`,
+          'Order Placed Successfully! 🎉',
+          `Your order will be delivered tomorrow at 7 AM.\n\nOrder ID: ${orderId.slice(0, 8)}\nPayment: Cash on Delivery`,
           [
             {
               text: 'View Orders',
-              onPress: () => navigation.navigate('ProfileTab', { screen: 'OrderHistory' }),
+              onPress: () => navigation.navigate('ProfileTab', {
+                screen: 'OrderHistory',
+              }),
             },
             {
               text: 'Continue Shopping',
-              onPress: () => navigation.navigate('HomeTab', { screen: 'HomeMain' }),
-            },
-          ]
-        );
-      } else {
-        // For online payment (future implementation)
-        Alert.alert(
-          'Proceeding to Payment',
-          'Online payment integration coming soon! For now, order is placed as COD.',
-          [
-            {
-              text: 'OK',
               onPress: () => navigation.navigate('HomeTab'),
             },
           ]
@@ -200,7 +292,7 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
         {/* Payment Method Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>💳 Payment Method</Text>
-          
+
           {/* Cash on Delivery */}
           <TouchableOpacity
             style={[
@@ -238,7 +330,7 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
               <View style={styles.paymentOptionDetails}>
                 <Text style={styles.paymentOptionTitle}>Online Payment</Text>
                 <Text style={styles.paymentOptionSubtitle}>
-                  UPI, Cards, Wallets (Coming Soon)
+                  UPI, Cards, Wallets via Razorpay
                 </Text>
               </View>
             </View>
@@ -263,7 +355,7 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
         </View>
 
         {/* Delivery Info */}
-        {/* <View style={styles.section}>
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>🚚 Delivery Information</Text>
           <View style={styles.infoCard}>
             <Text style={styles.infoText}>📅 Estimated Delivery: Tomorrow at 7 AM</Text>
@@ -272,7 +364,7 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
               💰 Payment: {paymentMethod === 'cod' ? 'Cash on Delivery' : 'Online Payment'}
             </Text>
           </View>
-        </View> */}
+        </View>
 
         {/* Price Breakdown */}
         <View style={styles.section}>
@@ -342,7 +434,7 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
             <ActivityIndicator color="#fff" />
           ) : (
             <Text style={styles.placeOrderText}>
-              {paymentMethod === 'cod' ? 'Place Order (COD)' : 'Proceed to Payment'}
+              {paymentMethod === 'cod' ? 'Place Order (COD)' : `Pay ${formatCurrency(total)}`}
             </Text>
           )}
         </TouchableOpacity>

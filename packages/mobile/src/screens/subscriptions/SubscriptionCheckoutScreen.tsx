@@ -8,6 +8,8 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import RazorpayCheckout from 'react-native-razorpay';
+import { RAZORPAY_CONFIG } from '@ecommerce/shared';
 import {
   useAuthStore,
   formatCurrency,
@@ -93,60 +95,149 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
     }
   };
 
+  const handleRazorpayPayment = async (): Promise<{
+    success: boolean;
+    paymentId: string;
+    orderId?: string;
+    signature?: string;
+  }> => {
+    if (!user || !selectedAddress) {
+      throw new Error('User or address not available');
+    }
+
+    const options = {
+      description: `Dairy Fresh Subscription - ${getFrequencyText(frequency)}`,
+      image: RAZORPAY_CONFIG.businessLogo,
+      currency: 'INR',
+      key: RAZORPAY_CONFIG.keyId,
+      amount: Math.round(totalAmount * 100), // Amount in paise
+      name: RAZORPAY_CONFIG.businessName,
+      prefill: {
+        email: user.email || '',
+        contact: user.phoneNumber || '',
+        name: user.name || '',
+      },
+      theme: { color: RAZORPAY_CONFIG.themeColor },
+    };
+
+    try {
+      const data = await RazorpayCheckout.open(options);
+
+      // Payment successful
+      console.log('✅ Payment Success:', data);
+      
+      return {
+        success: true,
+        paymentId: data.razorpay_payment_id,
+        orderId: data.razorpay_order_id,
+        signature: data.razorpay_signature,
+      };
+    } catch (error: any) {
+      console.log('❌ Payment Error:', error);
+      
+      if (error.code === RazorpayCheckout.PAYMENT_CANCELLED) {
+        throw new Error('Payment cancelled by user');
+      } else {
+        throw new Error(error.description || 'Payment failed');
+      }
+    }
+  };
+
   const handleCreateSubscription = async () => {
-  if (!user) {
-    Alert.alert('Error', 'Please login to create subscription');
-    return;
-  }
+    if (!user) {
+      Alert.alert('Error', 'Please login to create subscription');
+      return;
+    }
 
-  if (!selectedAddress) {
-    Alert.alert('Error', 'Please select a delivery address');
-    handleSelectAddress();
-    return;
-  }
+    if (!selectedAddress) {
+      Alert.alert('Error', 'Please select a delivery address');
+      handleSelectAddress();
+      return;
+    }
 
-  setLoading(true);
-  try {
-    const subscriptionItems: SubscriptionItem[] = items.map((item: CheckoutItem) => ({
-      productId: item.productId,
-      quantity: item.quantity,
-    }));
+    setLoading(true);
+    try {
+      const subscriptionItems: SubscriptionItem[] = items.map((item: CheckoutItem) => ({
+        productId: item.productId,
+        quantity: item.quantity,
+      }));
 
-    await createSubscription({
-      userId: user.id,
-      items: subscriptionItems,
-      frequency,
-      status: SubscriptionStatus.ACTIVE,
-      deliveryAddress: selectedAddress, // Pass full address object
-      startDate: dateToTimestamp(startDate),
-      endDate: dateToTimestamp(endDate),
-    });
+      if (paymentMethod === 'online') {
+        // Process online payment first
+        try {
+          const paymentResult = await handleRazorpayPayment();
+          
+          // Payment successful, create subscription
+          await createSubscription({
+            userId: user.id,
+            items: subscriptionItems,
+            frequency,
+            status: SubscriptionStatus.ACTIVE,
+            deliveryAddress: selectedAddress,
+            startDate: dateToTimestamp(startDate),
+            endDate: dateToTimestamp(endDate),
+          });
 
-    Alert.alert(
-      'Subscription Created! 🎉',
-      `Your subscription is now active!\n\n📦 Deliveries: ${totalDeliveries}\n💰 Total Paid: ${formatCurrency(totalAmount)}\n📅 First delivery: ${formatDate(dateToTimestamp(startDate))}`,
-      [
-        {
-          text: 'View Subscriptions',
-          onPress: () => {
-            navigation.navigate('SubscriptionsTab', {
-              screen: 'SubscriptionsList',
-            });
-          },
-        },
-        {
-          text: 'Continue Shopping',
-          onPress: () => navigation.navigate('HomeTab'),
-        },
-      ]
-    );
-  } catch (error: any) {
-    console.error('Error creating subscription:', error);
-    Alert.alert('Error', error.message || 'Failed to create subscription');
-  } finally {
-    setLoading(false);
-  }
-};
+          Alert.alert(
+            'Subscription Created! 🎉',
+            `Payment Successful!\n\n📦 Deliveries: ${totalDeliveries}\n💰 Amount Paid: ${formatCurrency(totalAmount)}\n📅 First delivery: ${formatDate(dateToTimestamp(startDate))}\n\nPayment ID: ${paymentResult.paymentId.slice(0, 12)}...`,
+            [
+              {
+                text: 'View Subscriptions',
+                onPress: () => navigation.navigate('SubscriptionsTab', {
+                  screen: 'SubscriptionsList',
+                }),
+              },
+              {
+                text: 'Continue Shopping',
+                onPress: () => navigation.navigate('HomeTab'),
+              },
+            ]
+          );
+        } catch (paymentError: any) {
+          Alert.alert(
+            'Payment Failed',
+            paymentError.message || 'Unable to process payment. Please try again.'
+          );
+          setLoading(false);
+          return;
+        }
+      } else {
+        // Cash on Delivery
+        await createSubscription({
+          userId: user.id,
+          items: subscriptionItems,
+          frequency,
+          status: SubscriptionStatus.ACTIVE,
+          deliveryAddress: selectedAddress,
+          startDate: dateToTimestamp(startDate),
+          endDate: dateToTimestamp(endDate),
+        });
+
+        Alert.alert(
+          'Subscription Created! 🎉',
+          `Your subscription is now active!\n\n📦 Deliveries: ${totalDeliveries}\n💰 Total Amount: ${formatCurrency(totalAmount)}\n💵 Payment: Cash on Delivery\n📅 First delivery: ${formatDate(dateToTimestamp(startDate))}`,
+          [
+            {
+              text: 'View Subscriptions',
+              onPress: () => navigation.navigate('SubscriptionsTab', {
+                screen: 'SubscriptionsList',
+              }),
+            },
+            {
+              text: 'Continue Shopping',
+              onPress: () => navigation.navigate('HomeTab'),
+            },
+          ]
+        );
+      }
+    } catch (error: any) {
+      console.error('Error creating subscription:', error);
+      Alert.alert('Error', error.message || 'Failed to create subscription');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (!user) {
     return (
