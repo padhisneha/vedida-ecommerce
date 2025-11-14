@@ -8,6 +8,7 @@ import {
   query,
   where,
   orderBy,
+  limit,
 } from 'firebase/firestore';
 import { getFirebaseFirestore } from './firebase-config';
 import {
@@ -20,13 +21,42 @@ import { getCurrentTimestamp } from '../utils';
 import { getProductById } from './products';
 
 /**
+ * Generate subscription number
+ */
+const generateSubscriptionNumber = async (): Promise<string> => {
+  const db = getFirebaseFirestore();
+  const year = new Date().getFullYear();
+
+  // Get the last subscription to determine the next sequence number
+  const q = query(
+    collection(db, COLLECTIONS.SUBSCRIPTIONS),
+    orderBy('createdAt', 'desc'),
+    limit(1)
+  );
+  const snapshot = await getDocs(q);
+
+  let sequence = 1;
+  if (!snapshot.empty) {
+    const lastSub = snapshot.docs[0].data() as Subscription;
+    if (lastSub.subscriptionNumber) {
+      // Extract sequence from format: SUB-YYYY-XXXXX
+      const lastSequence = parseInt(lastSub.subscriptionNumber.split('-')[2]);
+      sequence = lastSequence + 1;
+    }
+  }
+
+  return `SUB-${year}-${sequence.toString().padStart(5, '0')}`;
+};
+
+/**
  * Create a new subscription
  */
 export const createSubscription = async (
-  subscriptionData: Omit<Subscription, 'id' | 'createdAt' | 'updatedAt'>
+  subscriptionData: Omit<Subscription, 'id' | 'subscriptionNumber' | 'createdAt' | 'updatedAt'>
 ): Promise<string> => {
   const db = getFirebaseFirestore();
   const timestamp = getCurrentTimestamp();
+  const subscriptionNumber = await generateSubscriptionNumber();
 
   // Validate all products exist and support subscription
   for (const item of subscriptionData.items) {
@@ -44,6 +74,7 @@ export const createSubscription = async (
 
   const newSubscription = {
     ...subscriptionData,
+    subscriptionNumber,
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -90,6 +121,74 @@ export const getUserSubscriptionsWithProducts = async (userId: string): Promise<
     snapshot.docs.map(async (doc) => {
       const data = doc.data();
       
+      // Handle old schema with deliveryAddressId
+      if (!data.deliveryAddress && data.deliveryAddressId) {
+        data.deliveryAddress = {
+          id: data.deliveryAddressId,
+          label: 'Address',
+          street: 'Address details not available',
+          city: '-',
+          state: '-',
+          pincode: '000000',
+          isDefault: false,
+        };
+      }
+
+      // Populate product details for each item
+      const itemsWithProducts = await Promise.all(
+        (data.items || []).map(async (item: any) => {
+          const product = await getProductById(item.productId);
+          return {
+            ...item,
+            product: product || undefined,
+          };
+        })
+      );
+
+      return {
+        id: doc.id,
+        ...data,
+        items: itemsWithProducts,
+      } as Subscription;
+    })
+  );
+
+  return subscriptionsWithProducts;
+};
+
+/**
+ * Get all subscriptions (Admin only)
+ */
+export const getAllSubscriptions = async (): Promise<Subscription[]> => {
+  const db = getFirebaseFirestore();
+  const q = query(
+    collection(db, COLLECTIONS.SUBSCRIPTIONS),
+    orderBy('createdAt', 'desc')
+  );
+  const snapshot = await getDocs(q);
+
+  return snapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+  })) as Subscription[];
+};
+
+/**
+ * Get all subscriptions with populated product details (Admin only)
+ */
+export const getAllSubscriptionsWithProducts = async (): Promise<Subscription[]> => {
+  const db = getFirebaseFirestore();
+  const q = query(
+    collection(db, COLLECTIONS.SUBSCRIPTIONS),
+    orderBy('createdAt', 'desc')
+  );
+  const snapshot = await getDocs(q);
+
+  // Fetch subscriptions with populated products
+  const subscriptionsWithProducts = await Promise.all(
+    snapshot.docs.map(async (doc) => {
+      const data = doc.data();
+
       // Handle old schema with deliveryAddressId
       if (!data.deliveryAddress && data.deliveryAddressId) {
         data.deliveryAddress = {

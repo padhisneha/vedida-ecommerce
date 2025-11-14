@@ -100,6 +100,7 @@ export enum SubscriptionFrequency {
 }
 
 export enum SubscriptionStatus {
+  PENDING = 'pending',     // Added - waiting for admin acceptance
   ACTIVE = 'active',
   PAUSED = 'paused',
   COMPLETED = 'completed',
@@ -114,6 +115,7 @@ export interface SubscriptionItem {
 
 export interface Subscription {
   id: string;
+  subscriptionNumber: string; // Added - e.g., "SUB-2024-00001"
   userId: string;
   items: SubscriptionItem[];
   frequency: SubscriptionFrequency;
@@ -177,3 +179,6 @@ export const COLLECTIONS = {
   SUBSCRIPTIONS: 'subscriptions',
   ORDERS: 'orders',
 } as const;
+
+
+export * from './settings';

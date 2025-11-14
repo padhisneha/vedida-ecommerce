@@ -7,9 +7,10 @@ import {
   query,
   where,
   getDocs,
+  orderBy,
 } from 'firebase/firestore';
 import { getFirebaseFirestore } from './firebase-config';
-import { User, UserAddress, COLLECTIONS, UserRole } from '../types';
+import { User, UserAddress, COLLECTIONS, UserRole, Order, SubscriptionStatus } from '../types';
 import { getCurrentTimestamp } from '../utils';
 
 /**
@@ -149,4 +150,81 @@ export const deleteUserAddress = async (
     addresses: updatedAddresses,
     updatedAt: getCurrentTimestamp(),
   });
+};
+
+/**
+ * Get all users (Admin only)
+ */
+export const getAllUsers = async (): Promise<User[]> => {
+  const db = getFirebaseFirestore();
+  const q = query(
+    collection(db, COLLECTIONS.USERS),
+    orderBy('createdAt', 'desc')
+  );
+  const snapshot = await getDocs(q);
+
+  return snapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+  })) as User[];
+};
+
+/**
+ * Get users by role (Admin only)
+ */
+export const getUsersByRole = async (role: UserRole): Promise<User[]> => {
+  const db = getFirebaseFirestore();
+  const q = query(
+    collection(db, COLLECTIONS.USERS),
+    where('role', '==', role),
+    orderBy('createdAt', 'desc')
+  );
+  const snapshot = await getDocs(q);
+
+  return snapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+  })) as User[];
+};
+
+/**
+ * Get customer stats (Admin only)
+ */
+export const getCustomerStats = async (userId: string) => {
+  const db = getFirebaseFirestore();
+
+  // Get orders count
+  const ordersQuery = query(
+    collection(db, COLLECTIONS.ORDERS),
+    where('userId', '==', userId)
+  );
+  const ordersSnapshot = await getDocs(ordersQuery);
+  const totalOrders = ordersSnapshot.size;
+
+  // Calculate total spent
+  const orders = ordersSnapshot.docs.map((doc) => doc.data() as Order);
+  const totalSpent = orders.reduce((sum, order) => sum + order.totalAmount, 0);
+
+  // Get subscriptions count
+  const subsQuery = query(
+    collection(db, COLLECTIONS.SUBSCRIPTIONS),
+    where('userId', '==', userId)
+  );
+  const subsSnapshot = await getDocs(subsQuery);
+  const totalSubscriptions = subsSnapshot.size;
+
+  // Get active subscriptions count
+  const activeSubscriptions = subsSnapshot.docs.filter(
+    (doc) => {
+      const data = doc.data();
+      return data.status === SubscriptionStatus.ACTIVE || data.status === SubscriptionStatus.PAUSED;
+    }
+  ).length;
+
+  return {
+    totalOrders,
+    totalSpent,
+    totalSubscriptions,
+    activeSubscriptions,
+  };
 };

@@ -113,7 +113,7 @@ export const LoginScreen = () => {
       }
 
       setUser(user);
-      //Alert.alert('Success', 'Welcome to Dairy Fresh!');
+      //Alert.alert('Success', 'Welcome to Vedida Farms!');
     } catch (error: any) {
       console.error('❌ OTP verification error:', error);
       

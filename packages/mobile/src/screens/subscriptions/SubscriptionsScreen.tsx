@@ -62,9 +62,10 @@ export const SubscriptionsScreen = ({ navigation }: any) => {
 
   const getFilteredSubscriptions = () => {
     if (activeTab === 'active') {
-      // Active tab: Show ACTIVE and PAUSED subscriptions only
+      // Active tab: Show PENDING, ACTIVE and PAUSED subscriptions
       return subscriptions.filter(
         (sub) =>
+          sub.status === SubscriptionStatus.PENDING ||
           sub.status === SubscriptionStatus.ACTIVE ||
           sub.status === SubscriptionStatus.PAUSED
       );
@@ -81,6 +82,7 @@ export const SubscriptionsScreen = ({ navigation }: any) => {
   const getActiveCount = () => {
     return subscriptions.filter(
       (sub) =>
+        sub.status === SubscriptionStatus.PENDING ||
         sub.status === SubscriptionStatus.ACTIVE ||
         sub.status === SubscriptionStatus.PAUSED
     ).length;
@@ -96,12 +98,14 @@ export const SubscriptionsScreen = ({ navigation }: any) => {
 
   const getStatusColor = (status: SubscriptionStatus) => {
     switch (status) {
+      case SubscriptionStatus.PENDING:
+        return '#FFC107'; // Yellow for pending
       case SubscriptionStatus.ACTIVE:
         return '#4CAF50';
       case SubscriptionStatus.PAUSED:
         return '#FF9800';
       case SubscriptionStatus.COMPLETED:
-        return '#2196F3'; // Blue for completed
+        return '#2196F3';
       case SubscriptionStatus.CANCELLED:
         return '#f44336';
       default:
@@ -111,6 +115,8 @@ export const SubscriptionsScreen = ({ navigation }: any) => {
 
   const getStatusText = (status: SubscriptionStatus) => {
     switch (status) {
+      case SubscriptionStatus.PENDING:
+        return 'Pending';
       case SubscriptionStatus.ACTIVE:
         return 'Active';
       case SubscriptionStatus.PAUSED:

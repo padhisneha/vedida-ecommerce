@@ -4,3 +4,5 @@ export * from './products';
 export * from './cart';
 export * from './subscriptions';
 export * from './orders';
+export * from './settings';
+export * from './storage';

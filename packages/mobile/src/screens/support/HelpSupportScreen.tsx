@@ -18,7 +18,7 @@ export const HelpSupportScreen = ({ navigation }: any) => {
 
   const handleEmailPress = async () => {
     const email = SUPPORT_CONTACT.email;
-    const subject = 'Support Request - Dairy Fresh';
+    const subject = 'Support Request - Vedida Farms App';
     const body = `\n\n---\nApp Version: ${appVersion}\nBuild: ${buildNumber}\nDevice: ${Constants.deviceName || 'Unknown'}`;
     const url = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 
@@ -52,7 +52,7 @@ export const HelpSupportScreen = ({ navigation }: any) => {
   };
 
   const handleWhatsAppPress = async () => {
-    const message = `Hi, I need help with my Dairy Fresh order.\n\nApp Version: ${appVersion}`;
+    const message = `Hi, I need help with my Vedida Farms order.\n\nApp Version: ${appVersion}`;
     const url = `whatsapp://send?phone=${SUPPORT_CONTACT.whatsapp}&text=${encodeURIComponent(message)}`;
 
     try {

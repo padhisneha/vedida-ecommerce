@@ -109,7 +109,7 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
     }
 
     const options = {
-      description: 'Dairy Fresh Order',
+      description: 'Vedida Farms Order',
       image: RAZORPAY_CONFIG.businessLogo,
       currency: 'INR',
       key: RAZORPAY_CONFIG.keyId,

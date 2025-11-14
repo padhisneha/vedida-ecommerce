@@ -106,7 +106,7 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
     }
 
     const options = {
-      description: `Dairy Fresh Subscription - ${getFrequencyText(frequency)}`,
+      description: `Vedida Farms Subscription - ${getFrequencyText(frequency)}`,
       image: RAZORPAY_CONFIG.businessLogo,
       currency: 'INR',
       key: RAZORPAY_CONFIG.keyId,
@@ -172,7 +172,7 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
             userId: user.id,
             items: subscriptionItems,
             frequency,
-            status: SubscriptionStatus.ACTIVE,
+            status: SubscriptionStatus.PENDING,
             deliveryAddress: selectedAddress,
             startDate: dateToTimestamp(startDate),
             endDate: dateToTimestamp(endDate),
