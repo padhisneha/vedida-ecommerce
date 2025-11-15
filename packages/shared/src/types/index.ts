@@ -7,6 +7,8 @@ import { Timestamp } from 'firebase/firestore';
 export enum UserRole {
   CUSTOMER = 'customer',
   ADMIN = 'admin',
+  DELIVERY_PARTNER = 'delivery_partner',
+  OPERATOR = 'operator',
 }
 
 export interface UserAddress {
@@ -28,6 +30,13 @@ export interface User {
   email?: string;
   role: UserRole;
   addresses: UserAddress[];
+
+  // Delivery Partner specific fields
+  vehicleType?: string; // 'bike', 'car', 'bicycle'
+  vehicleNumber?: string;
+  isActive?: boolean; // For suspending delivery partners
+  totalDeliveries?: number; // Track completed deliveries
+
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -124,6 +133,11 @@ export interface Subscription {
   startDate: Timestamp;
   endDate?: Timestamp;
   pausedUntil?: Timestamp;
+
+  // Delivery Partner fields
+  deliveryPartnerId?: string;
+  deliveryPartnerName?: string;
+  
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -164,6 +178,12 @@ export interface Order {
   status: OrderStatus;
   scheduledDeliveryDate: Timestamp;
   deliveredAt?: Timestamp;
+
+  // Delivery Partner fields
+  deliveryPartnerId?: string;
+  deliveryPartnerName?: string; // Denormalized for quick display
+  deliveryNotes?: string;
+
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

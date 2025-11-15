@@ -5,6 +5,7 @@ import { User, UserRole } from '@ecommerce/shared';
 import { getFirebaseAuth, getUserById } from '@ecommerce/shared';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { initializeApp } from '@/lib/firebase';
+import { showToast } from '@/lib/toast';
 
 interface AuthContextType {
   user: User | null;
@@ -57,13 +58,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               console.log('⚠️ User is not an admin. Role:', userData.role);
               setUser(null);
               await signOut(auth);
-              alert('Access denied. Admin privileges required.');
+              showToast.error('Access denied. Admin privileges required.');
             }
           } else {
             console.log('❌ User document not found in Firestore for UID:', firebaseUser.uid);
             setUser(null);
             await signOut(auth);
-            alert('User not found. Please contact administrator.');
+            showToast.error('User not found. Please contact administrator.');
           }
         } catch (error) {
           console.error('❌ Error fetching user:', error);

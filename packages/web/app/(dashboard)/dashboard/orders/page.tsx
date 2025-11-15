@@ -9,6 +9,7 @@ import {
   formatCurrency,
   formatDate,
 } from '@ecommerce/shared';
+import { showToast } from '@/lib/toast';
 
 type TabType = 'new' | 'active' | 'closed';
 
@@ -31,7 +32,7 @@ export default function OrdersPage() {
       console.log('✅ Loaded orders:', data.length);
     } catch (error) {
       console.error('Error loading orders:', error);
-      alert('Failed to load orders');
+      showToast.error('Failed to load orders');
     } finally {
       setLoading(false);
     }

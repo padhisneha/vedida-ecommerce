@@ -10,6 +10,8 @@ import {
   ConfirmationResult,
 } from 'firebase/auth';
 import { initializeApp } from '@/lib/firebase';
+import { showToast } from '@/lib/toast';
+import Image from 'next/image';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -78,12 +80,12 @@ export default function LoginPage() {
     e.preventDefault();
     
     if (!phoneNumber || phoneNumber.length !== 10) {
-      alert('Please enter a valid 10-digit phone number');
+      showToast.error('Please enter a valid 10-digit phone number');
       return;
     }
 
     if (!recaptchaVerifier) {
-      alert('Security check is still loading. Please wait a moment and try again.');
+      showToast.error('Security check is still loading. Please wait a moment and try again.');
       return;
     }
 
@@ -101,7 +103,7 @@ export default function LoginPage() {
       );
 
       setVerificationId(confirmation);
-      alert('OTP sent successfully! Check your phone.');
+      showToast.success('OTP sent successfully! Check your phone.');
     } catch (error: any) {
       console.error('OTP send error:', error);
       
@@ -115,7 +117,7 @@ export default function LoginPage() {
         errorMessage = 'SMS quota exceeded. Please contact support.';
       }
       
-      alert(errorMessage);
+      showToast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -125,12 +127,12 @@ export default function LoginPage() {
     e.preventDefault();
     
     if (!otp || otp.length !== 6) {
-      alert('Please enter a valid 6-digit OTP');
+      showToast.error('Please enter a valid 6-digit OTP');
       return;
     }
 
     if (!verificationId) {
-      alert('Please request OTP first');
+      showToast.error('Please request OTP first');
       return;
     }
 
@@ -155,7 +157,7 @@ export default function LoginPage() {
         errorMessage = 'OTP expired. Please request a new one.';
       }
       
-      alert(errorMessage);
+      showToast.error(errorMessage);
       setLoading(false);
     }
     // Don't set loading to false here - let the redirect happen
@@ -166,7 +168,7 @@ export default function LoginPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-white">
         <div className="text-center">
-          <div className="text-6xl mb-4 animate-pulse">🥛</div>
+          <div className="text-6xl mb-4 animate-pulse"><Image src="/logo.png" width={160} height={160} className="mx-auto object-contain drop-shadow-xl" alt="Logo" /></div>
           <div className="text-lg text-gray-600">Checking authentication...</div>
         </div>
       </div>
@@ -180,13 +182,13 @@ export default function LoginPage() {
 
       {!initialized ? (
         <div className="text-center">
-          <div className="text-6xl mb-4 animate-pulse">🥛</div>
+          <div className="text-6xl mb-4 animate-pulse"><Image src="/logo.png" width={160} height={160} className="mx-auto object-contain drop-shadow-xl" alt="Logo" /></div>
           <div className="text-lg text-gray-600">Initializing security...</div>
         </div>
       ) : (
         <div className="max-w-md w-full">
           <div className="text-center mb-8">
-            <div className="text-6xl mb-4">🥛</div>
+            <div className="text-6xl mb-4"><Image src="/logo.png" width="160" height={160} className="mx-auto object-contain drop-shadow-xl" alt="Logo" /></div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">
               Vedida Farms Admin
             </h1>
@@ -226,7 +228,7 @@ export default function LoginPage() {
 
                 <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                   <p className="text-sm text-blue-800">
-                    📱 Admin access only. Use your registered admin phone number.
+                    Admin access only. Use your registered admin phone number.
                   </p>
                 </div>
 

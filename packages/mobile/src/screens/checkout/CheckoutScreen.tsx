@@ -84,8 +84,7 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
     deliveryDate.setDate(deliveryDate.getDate() + 1);
     deliveryDate.setHours(7, 0, 0, 0); // 7 AM delivery
 
-    // Create order
-    const orderId = await createOrder({
+    const orderData = {
       userId: user.id,
       type: OrderType.ONE_TIME,
       items: orderItems,
@@ -93,9 +92,27 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
       deliveryAddress: selectedAddress,
       status: OrderStatus.PENDING,
       scheduledDeliveryDate: dateToTimestamp(deliveryDate),
-    });
+    };
 
-    return orderId;
+    console.log('=== Order Creation Debug ===');
+    console.log('User ID:', user.id);
+    console.log('User Role:', user.role);
+    console.log('Order Type:', OrderType.ONE_TIME);
+    console.log('Status:', OrderStatus.PENDING);
+    console.log('Total Amount:', total);
+    console.log('Full Order Data:', JSON.stringify(orderData, null, 2));
+    console.log('========================');
+
+    try {
+      const orderId = await createOrder(orderData);
+      console.log('✅ Order created successfully:', orderId);
+      return orderId;
+    } catch (error: any) {
+      console.error('❌ Order creation failed:', error);
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
+      throw error;
+    }
   };
 
   const handleRazorpayPayment = async (): Promise<{
@@ -203,6 +220,7 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
           return;
         }
       } else {
+
         // Cash on Delivery
         orderId = await createOrderInDatabase();
         

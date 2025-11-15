@@ -443,3 +443,66 @@ export const generateSubscriptionOrders = async (
 
   return { created, skipped, errors };
 };
+
+/**
+ * Assign delivery partner to order
+ */
+export const assignDeliveryPartner = async (
+  orderId: string,
+  partnerId: string,
+  partnerName: string
+): Promise<void> => {
+  const db = getFirebaseFirestore();
+  await updateDoc(doc(db, COLLECTIONS.ORDERS, orderId), {
+    deliveryPartnerId: partnerId,
+    deliveryPartnerName: partnerName,
+    updatedAt: getCurrentTimestamp(),
+  });
+};
+
+/**
+ * Bulk assign delivery partner to multiple orders
+ */
+export const bulkAssignDeliveryPartner = async (
+  orderIds: string[],
+  partnerId: string,
+  partnerName: string
+): Promise<{ success: number; failed: number }> => {
+  let success = 0;
+  let failed = 0;
+
+  for (const orderId of orderIds) {
+    try {
+      await assignDeliveryPartner(orderId, partnerId, partnerName);
+      success++;
+    } catch (error) {
+      console.error(`Failed to assign partner to order ${orderId}:`, error);
+      failed++;
+    }
+  }
+
+  return { success, failed };
+};
+
+/**
+ * Bulk update order status
+ */
+export const bulkUpdateOrderStatus = async (
+  orderIds: string[],
+  status: OrderStatus
+): Promise<{ success: number; failed: number }> => {
+  let success = 0;
+  let failed = 0;
+
+  for (const orderId of orderIds) {
+    try {
+      await updateOrderStatus(orderId, status);
+      success++;
+    } catch (error) {
+      console.error(`Failed to update order ${orderId}:`, error);
+      failed++;
+    }
+  }
+
+  return { success, failed };
+};

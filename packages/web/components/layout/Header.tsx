@@ -3,6 +3,7 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useState } from 'react';
 import MobileSidebar from './MobileSidebar';
+import Image from 'next/image';
 
 export default function Header() {
   const { user, logout } = useAuth();
@@ -24,7 +25,7 @@ export default function Header() {
             
             {/* Mobile logo */}
             <div className="flex items-center md:hidden">
-              <div className="text-2xl mr-2">🥛</div>
+              <div className="text-2xl mr-2"><Image src="/logo.png" width={80} height={80} className="object-cover" alt="Logo" /></div>
               <div>
                 <h1 className="text-lg font-bold text-gray-900">Vedida Farms</h1>
               </div>

@@ -348,3 +348,65 @@ export const getSubscriptionWithProducts = async (
     items: itemsWithProducts,
   };
 };
+
+/**
+ * Assign delivery partner to subscription
+ */
+export const assignDeliveryPartnerToSubscription = async (
+  subscriptionId: string,
+  partnerId: string,
+  partnerName: string
+): Promise<void> => {
+  const db = getFirebaseFirestore();
+  await updateDoc(doc(db, COLLECTIONS.SUBSCRIPTIONS, subscriptionId), {
+    deliveryPartnerId: partnerId,
+    deliveryPartnerName: partnerName,
+    updatedAt: getCurrentTimestamp(),
+  });
+};
+
+/**
+ * Bulk accept pending subscriptions
+ */
+export const bulkAcceptSubscriptions = async (
+  subscriptionIds: string[]
+): Promise<{ success: number; failed: number }> => {
+  let success = 0;
+  let failed = 0;
+
+  for (const subscriptionId of subscriptionIds) {
+    try {
+      await updateSubscriptionStatus(subscriptionId, SubscriptionStatus.ACTIVE);
+      success++;
+    } catch (error) {
+      console.error(`Failed to accept subscription ${subscriptionId}:`, error);
+      failed++;
+    }
+  }
+
+  return { success, failed };
+};
+
+/**
+ * Bulk assign delivery partner to subscriptions
+ */
+export const bulkAssignDeliveryPartnerToSubscriptions = async (
+  subscriptionIds: string[],
+  partnerId: string,
+  partnerName: string
+): Promise<{ success: number; failed: number }> => {
+  let success = 0;
+  let failed = 0;
+
+  for (const subscriptionId of subscriptionIds) {
+    try {
+      await assignDeliveryPartnerToSubscription(subscriptionId, partnerId, partnerName);
+      success++;
+    } catch (error) {
+      console.error(`Failed to assign partner to subscription ${subscriptionId}:`, error);
+      failed++;
+    }
+  }
+
+  return { success, failed };
+};

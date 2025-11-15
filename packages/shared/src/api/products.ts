@@ -23,8 +23,16 @@ export const createProduct = async (
   const db = getFirebaseFirestore();
   const timestamp = getCurrentTimestamp();
 
+  // Remove undefined values
+  const cleanedData: any = {};
+  Object.entries(productData).forEach(([key, value]) => {
+    if (value !== undefined) {
+      cleanedData[key] = value;
+    }
+  });
+
   const newProduct = {
-    ...productData,
+    ...cleanedData,
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -110,8 +118,17 @@ export const updateProduct = async (
   updates: Partial<Omit<Product, 'id' | 'createdAt'>>
 ): Promise<void> => {
   const db = getFirebaseFirestore();
+  
+  // Remove undefined values from updates
+  const cleanedUpdates: any = {};
+  Object.entries(updates).forEach(([key, value]) => {
+    if (value !== undefined) {
+      cleanedUpdates[key] = value;
+    }
+  });
+  
   await updateDoc(doc(db, COLLECTIONS.PRODUCTS, productId), {
-    ...updates,
+    ...cleanedUpdates,
     updatedAt: getCurrentTimestamp(),
   });
 };

@@ -13,6 +13,7 @@ import {
   formatDate,
   formatDateTime,
 } from '@ecommerce/shared';
+import { showToast } from '@/lib/toast';
 
 export default function SubscriptionDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -31,7 +32,7 @@ export default function SubscriptionDetailPage({ params }: { params: { id: strin
       console.log('✅ Loaded subscription:', data);
     } catch (error) {
       console.error('Error loading subscription:', error);
-      alert('Failed to load subscription details');
+      showToast.error('Failed to load subscription details');
     } finally {
       setLoading(false);
     }
@@ -54,11 +55,11 @@ export default function SubscriptionDetailPage({ params }: { params: { id: strin
     setUpdating(true);
     try {
       await updateSubscriptionStatus(params.id, newStatus, pauseUntil);
-      alert('✅ Subscription status updated successfully!');
+      showToast.success('Subscription status updated successfully!');
       await loadSubscription();
     } catch (error) {
       console.error('Error updating subscription status:', error);
-      alert('❌ Failed to update subscription status');
+      showToast.error('Failed to update subscription status');
     } finally {
       setUpdating(false);
     }
@@ -70,7 +71,7 @@ export default function SubscriptionDetailPage({ params }: { params: { id: strin
 
     const pauseDays = parseInt(days);
     if (isNaN(pauseDays) || pauseDays <= 0) {
-      alert('Please enter a valid number of days');
+      showToast.error('Please enter a valid number of days');
       return;
     }
 

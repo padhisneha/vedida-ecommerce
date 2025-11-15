@@ -8,6 +8,7 @@ import {
   ProductCategory,
   formatCurrency,
 } from '@ecommerce/shared';
+import { showToast } from '@/lib/toast';
 
 export default function InventoryPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -29,7 +30,7 @@ export default function InventoryPage() {
       console.log('✅ Loaded products:', data.length);
     } catch (error) {
       console.error('Error loading products:', error);
-      alert('Failed to load products');
+      showToast.error('Failed to load products');
     } finally {
       setLoading(false);
     }

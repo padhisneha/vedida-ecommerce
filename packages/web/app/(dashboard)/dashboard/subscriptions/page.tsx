@@ -10,6 +10,7 @@ import {
   formatCurrency,
   formatDate,
 } from '@ecommerce/shared';
+import { showToast } from '@/lib/toast';
 
 type TabType = 'new' | 'active' | 'closed';
 
@@ -32,7 +33,7 @@ export default function SubscriptionsPage() {
       console.log('✅ Loaded subscriptions with products:', data.length);
     } catch (error) {
       console.error('Error loading subscriptions:', error);
-      alert('Failed to load subscriptions');
+      showToast.error('Failed to load subscriptions');
     } finally {
       setLoading(false);
     }

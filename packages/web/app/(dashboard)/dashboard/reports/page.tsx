@@ -7,6 +7,7 @@ import {
   OrderStatus,
   formatCurrency,
 } from '@ecommerce/shared';
+import { showToast } from '@/lib/toast';
 
 export default function ReportsPage() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -27,7 +28,7 @@ export default function ReportsPage() {
       console.log('✅ Loaded orders with products for reports:', data.length);
     } catch (error) {
       console.error('Error loading orders:', error);
-      alert('Failed to load orders for reports');
+      showToast.error('Failed to load orders for reports');
     } finally {
       setLoading(false);
     }

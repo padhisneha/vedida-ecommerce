@@ -14,6 +14,7 @@ import {
   UserRole,
   formatDate,
 } from '@ecommerce/shared';
+import { showToast } from '@/lib/toast';
 
 type TabType = 'fees' | 'delivery' | 'support' | 'users';
 
@@ -61,7 +62,7 @@ export default function SettingsPage() {
       console.log('✅ Loaded settings');
     } catch (error) {
       console.error('Error loading settings:', error);
-      alert('Failed to load settings');
+      showToast.error('Failed to load settings');
     } finally {
       setLoading(false);
     }
@@ -78,7 +79,7 @@ export default function SettingsPage() {
 
   const handleSaveFees = async () => {
     if (platformFee < 0 || deliveryFee < 0 || minimumOrderAmount < 0) {
-      alert('Fees cannot be negative');
+      showToast.error('Fees cannot be negative');
       return;
     }
 
@@ -90,11 +91,11 @@ export default function SettingsPage() {
         minimumOrderAmount,
       });
       
-      alert('✅ Fee configuration updated successfully!');
+      showToast.success('Fee configuration updated successfully!');
       await loadSettings();
     } catch (error) {
       console.error('Error saving fees:', error);
-      alert('❌ Failed to save fee configuration');
+      showToast.error('Failed to save fee configuration');
     } finally {
       setSaving(false);
     }
@@ -102,7 +103,7 @@ export default function SettingsPage() {
 
   const handleSaveDelivery = async () => {
     if (maxDeliveryDistance <= 0) {
-      alert('Maximum delivery distance must be greater than 0');
+      showToast.error('Maximum delivery distance must be greater than 0');
       return;
     }
 
@@ -112,11 +113,11 @@ export default function SettingsPage() {
         maxDeliveryDistance,
       });
       
-      alert('✅ Delivery settings updated successfully!');
+      showToast.success('Delivery settings updated successfully!');
       await loadSettings();
     } catch (error) {
       console.error('Error saving delivery settings:', error);
-      alert('❌ Failed to save delivery settings');
+      showToast.error('Failed to save delivery settings');
     } finally {
       setSaving(false);
     }
@@ -124,12 +125,12 @@ export default function SettingsPage() {
 
   const handleAddDeliveryArea = async () => {
     if (!newAreaName.trim() || !newAreaPincode.trim()) {
-      alert('Please enter area name and pincode');
+      showToast.error('Please enter area name and pincode');
       return;
     }
 
     if (newAreaPincode.length !== 6) {
-      alert('Pincode must be 6 digits');
+      showToast.error('Pincode must be 6 digits');
       return;
     }
 
@@ -143,11 +144,11 @@ export default function SettingsPage() {
       
       setNewAreaName('');
       setNewAreaPincode('');
-      alert('✅ Delivery area added successfully!');
+      showToast.success('Delivery area added successfully!');
       await loadSettings();
     } catch (error) {
       console.error('Error adding delivery area:', error);
-      alert('❌ Failed to add delivery area');
+      showToast.error('Failed to add delivery area');
     } finally {
       setSaving(false);
     }
@@ -161,11 +162,11 @@ export default function SettingsPage() {
     setSaving(true);
     try {
       await removeDeliveryArea(areaId);
-      alert('✅ Delivery area removed successfully!');
+      showToast.success('Delivery area removed successfully!');
       await loadSettings();
     } catch (error) {
       console.error('Error removing delivery area:', error);
-      alert('❌ Failed to remove delivery area');
+      showToast.error('Failed to remove delivery area');
     } finally {
       setSaving(false);
     }
@@ -178,7 +179,7 @@ export default function SettingsPage() {
       await loadSettings();
     } catch (error) {
       console.error('Error toggling delivery area:', error);
-      alert('❌ Failed to toggle delivery area');
+      showToast.error('Failed to toggle delivery area');
     } finally {
       setSaving(false);
     }
@@ -186,7 +187,7 @@ export default function SettingsPage() {
 
   const handleSaveSupport = async () => {
     if (!supportEmail.trim() || !supportPhone.trim() || !supportWhatsApp.trim()) {
-      alert('All support contact fields are required');
+      showToast.error('All support contact fields are required');
       return;
     }
 
@@ -198,11 +199,11 @@ export default function SettingsPage() {
         supportWhatsApp: supportWhatsApp.trim(),
       });
       
-      alert('✅ Support contact updated successfully!');
+      showToast.success('Support contact updated successfully!');
       await loadSettings();
     } catch (error) {
       console.error('Error saving support contact:', error);
-      alert('❌ Failed to save support contact');
+      showToast.error('Failed to save support contact');
     } finally {
       setSaving(false);
     }

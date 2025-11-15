@@ -1,0 +1,114 @@
+// Go to Firebase Console → Firestore Database → Rules tab. Replace the existing rules with below content.
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isSignedIn() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    
+    function isValidEmail(email) {
+      return email.matches('^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$');
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      // Anyone can read their own user document
+      allow read: if isOwner(userId);
+      
+      // Users can create their own document during signup
+      allow create: if isSignedIn() && 
+                       isOwner(userId) &&
+                       request.resource.data.role == 'customer'; // Prevent self-assigning admin
+      
+      // Users can update their own profile (except role and createdAt)
+      allow update: if isOwner(userId) &&
+                       request.resource.data.role == resource.data.role && // Can't change own role
+                       request.resource.data.createdAt == resource.data.createdAt;
+      
+      // Admins can read and update any user
+      allow read, update: if isAdmin();
+      
+      // No one can delete users (soft delete only)
+      allow delete: if false;
+    }
+    
+    // Products collection
+    match /products/{productId} {
+      // Anyone (including unauthenticated) can read products
+      allow read: if true;
+      
+      // Only admins can create, update, or delete products
+      allow create, update, delete: if isAdmin();
+    }
+    
+    // Carts collection
+    match /carts/{cartId} {
+      // Users can only access their own cart
+      allow read, write: if isOwner(cartId);
+      
+      // Admins can read any cart
+      allow read: if isAdmin();
+    }
+    
+    // Orders collection
+    match /orders/{orderId} {
+      // Users can read their own orders
+      allow read: if isSignedIn() && 
+                     resource.data.userId == request.auth.uid;
+      
+      // Users can create orders for themselves
+      allow create: if isSignedIn() && 
+                       request.resource.data.userId == request.auth.uid &&
+                       request.resource.data.status == 'pending';
+      
+      // Admins can read and update all orders
+      allow read, create, update: if isAdmin();
+      
+      // No one can delete orders
+      allow delete: if false;
+    }
+    
+    // Subscriptions collection
+    match /subscriptions/{subscriptionId} {
+      // Users can read their own subscriptions
+      allow read: if isSignedIn() && 
+                     resource.data.userId == request.auth.uid;
+      
+      // Users can create subscriptions for themselves (with pending status)
+      allow create: if isSignedIn() && 
+                       request.resource.data.userId == request.auth.uid &&
+                       request.resource.data.status == 'pending';
+      
+      // Users can update their own subscriptions (limited fields)
+      allow update: if isSignedIn() && 
+                       resource.data.userId == request.auth.uid &&
+                       request.resource.data.userId == resource.data.userId && // Can't reassign
+                       request.resource.data.createdAt == resource.data.createdAt; // Can't change created date
+      
+      // Admins can read and update all subscriptions
+      allow read, update: if isAdmin();
+      
+      // No one can delete subscriptions
+      allow delete: if false;
+    }
+    
+    // Settings collection (Admin only)
+    match /settings/{settingId} {
+      allow read: if true; // Allow reading for app functionality
+      allow write: if isAdmin();
+    }
+  }
+}

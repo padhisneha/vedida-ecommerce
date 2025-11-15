@@ -6,6 +6,7 @@ import Link from 'next/link';
 import {
   getOrderByIdWithProducts,
   updateOrderStatus,
+  assignDeliveryPartner,
   Order,
   OrderStatus,
   formatCurrency,
@@ -14,6 +15,7 @@ import {
   PLATFORM_FEE,
   DELIVERY_FEE,
 } from '@ecommerce/shared';
+import { showToast } from '@/lib/toast';
 
 export default function OrderDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -32,7 +34,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
       console.log('✅ Loaded order:', data);
     } catch (error) {
       console.error('Error loading order:', error);
-      alert('Failed to load order details');
+      showToast.error('Failed to load order details');
     } finally {
       setLoading(false);
     }
@@ -54,13 +56,17 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
     }
 
     setUpdating(true);
+    const toastId = showToast.loading('Updating order status...');
+
     try {
       await updateOrderStatus(order.id, newStatus);
-      alert('✅ Order status updated successfully!');
+      showToast.dismiss(toastId);
+      showToast.success('Order status updated successfully!');
       await loadOrder();
     } catch (error) {
       console.error('Error updating order status:', error);
-      alert('❌ Failed to update order status');
+      showToast.dismiss(toastId);
+      showToast.error('Failed to update order status');
     } finally {
       setUpdating(false);
     }

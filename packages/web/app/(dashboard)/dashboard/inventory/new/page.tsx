@@ -8,11 +8,16 @@ import {
   ProductCategory,
   ProductUnit,
   formatCurrency,
+  uploadImage,
+  generateProductImagePath,
 } from '@ecommerce/shared';
+import { showToast } from '@/lib/toast';
 
 export default function NewProductPage() {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -32,28 +37,59 @@ export default function NewProductPage() {
     return formData.priceExcludingTax + tax;
   };
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      showToast.error('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      showToast.error('Image size must be less than 5MB');
+      return;
+    }
+
+    setImageFile(file);
+    
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+    
+    showToast.success('Image selected! Ready to upload.');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.name.trim()) {
-      alert('Please enter product name');
+      showToast.error('Please enter product name');
       return;
     }
 
     if (formData.priceExcludingTax <= 0) {
-      alert('Please enter a valid price');
+      showToast.error('Please enter a valid price');
       return;
     }
 
     if (formData.quantity <= 0) {
-      alert('Please enter a valid quantity');
+      showToast.error('Please enter a valid quantity');
       return;
     }
 
     setSaving(true);
+    const toastId = showToast.loading('Creating product...');
+    
     try {
       const calculatedPrice = calculatePriceWithTax();
 
+      // First create the product to get an ID
       const productId = await createProduct({
         name: formData.name.trim(),
         description: formData.description.trim(),
@@ -68,11 +104,32 @@ export default function NewProductPage() {
         allowSubscription: formData.allowSubscription,
       });
 
-      alert('✅ Product created successfully!');
+      // Upload image if selected
+      if (imageFile) {
+        showToast.loading('Uploading product image...', { id: toastId });
+        
+        try {
+          const path = generateProductImagePath(productId, imageFile.name);
+          const imageUrl = await uploadImage(imageFile, path);
+          
+          // Update product with image URL
+          const { updateProduct } = await import('@ecommerce/shared');
+          await updateProduct(productId, { imageUrl });
+          
+          console.log('✅ Image uploaded:', imageUrl);
+        } catch (imageError) {
+          console.error('Image upload error:', imageError);
+          showToast.error('Product created but image upload failed');
+        }
+      }
+
+      showToast.dismiss(toastId);
+      showToast.success('Product created successfully!');
       router.push(`/dashboard/inventory/${productId}`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating product:', error);
-      alert('❌ Failed to create product');
+      showToast.dismiss(toastId);
+      showToast.error(`Failed to create product: ${error.message || 'Unknown error'}`);
       setSaving(false);
     }
   };
@@ -97,6 +154,64 @@ export default function NewProductPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column: Form */}
           <div className="lg:col-span-2 space-y-6">
+            {/* Product Image Upload */}
+            <div className="card">
+              <h2 className="text-lg font-bold text-gray-900 mb-4">
+                🖼️ Product Image
+              </h2>
+              <div className="space-y-4">
+                {/* Image Preview */}
+                <div className="h-64 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden border-2 border-dashed border-gray-300">
+                  {imagePreview ? (
+                    <img
+                      src={imagePreview}
+                      alt="Preview"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="text-center">
+                      <div className="text-8xl mb-2">📦</div>
+                      <p className="text-gray-500 text-sm">No image selected</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* File Input */}
+                <div>
+                  <label className="label">Upload Product Image</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="block w-full text-sm text-gray-500
+                      file:mr-4 file:py-2 file:px-4
+                      file:rounded-lg file:border-0
+                      file:text-sm file:font-semibold
+                      file:bg-primary-50 file:text-primary-700
+                      hover:file:bg-primary-100
+                      cursor-pointer border border-gray-300 rounded-lg"
+                  />
+                  <p className="text-xs text-gray-500 mt-2">
+                    📷 PNG, JPG, JPEG up to 5MB • Recommended: 800x800px
+                  </p>
+                </div>
+
+                {imagePreview && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setImageFile(null);
+                      setImagePreview(null);
+                      showToast.success('Image removed');
+                    }}
+                    className="btn-secondary text-sm"
+                  >
+                    ✕ Remove Image
+                  </button>
+                )}
+              </div>
+            </div>
+
             {/* Basic Information */}
             <div className="card">
               <h2 className="text-lg font-bold text-gray-900 mb-4">
@@ -300,8 +415,16 @@ export default function NewProductPage() {
                 👁️ Preview
               </h2>
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
-                <div className="h-40 bg-gray-100 rounded-lg flex items-center justify-center mb-3">
-                  <div className="text-6xl">📦</div>
+                <div className="h-40 bg-gray-100 rounded-lg flex items-center justify-center mb-3 overflow-hidden">
+                  {imagePreview ? (
+                    <img
+                      src={imagePreview}
+                      alt="Preview"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="text-6xl">📦</div>
+                  )}
                 </div>
                 <h3 className="font-semibold text-gray-900 mb-1">
                   {formData.name || 'Product Name'}
@@ -322,6 +445,11 @@ export default function NewProductPage() {
                     📅 Subscription Available
                   </div>
                 )}
+                {!formData.inStock && (
+                  <div className="mt-2 bg-red-50 text-red-700 text-xs px-2 py-1 rounded inline-block">
+                    ❌ Out of Stock
+                  </div>
+                )}
               </div>
             </div>
 
@@ -332,11 +460,17 @@ export default function NewProductPage() {
               </h2>
               <button
                 type="submit"
-                onClick={handleSubmit}
                 disabled={saving}
                 className="btn-primary w-full mb-3"
               >
-                {saving ? 'Creating Product...' : '✅ Create Product'}
+                {saving ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="animate-spin">⏳</span>
+                    <span>Creating...</span>
+                  </span>
+                ) : (
+                  '✅ Create Product'
+                )}
               </button>
               <Link
                 href="/dashboard/inventory"
@@ -350,8 +484,8 @@ export default function NewProductPage() {
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <h3 className="font-semibold text-blue-900 mb-2">💡 Quick Tips</h3>
               <ul className="text-sm text-blue-800 space-y-2">
-                <li>• Use clear, descriptive product names</li>
-                <li>• Add detailed descriptions for better customer understanding</li>
+                <li>• Upload a clear product image for better visibility</li>
+                <li>• Use descriptive product names</li>
                 <li>• Set appropriate tax rates (CGST + SGST)</li>
                 <li>• Enable subscriptions for regularly ordered items</li>
               </ul>

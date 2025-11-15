@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
+import Image from 'next/image';
 
 interface NavItem {
   name: string;
@@ -15,6 +16,7 @@ const navigation: NavItem[] = [
   { name: 'Orders', href: '/dashboard/orders', icon: '📦' },
   { name: 'Subscriptions', href: '/dashboard/subscriptions', icon: '📅' },
   { name: 'Customers', href: '/dashboard/customers', icon: '👥' },
+  { name: 'Delivery Partners', href: '/dashboard/delivery-partners', icon: '🚚' },
   { name: 'Inventory', href: '/dashboard/inventory', icon: '🏪' },
   { name: 'Reports', href: '/dashboard/reports', icon: '📈' },
   { name: 'Settings', href: '/dashboard/settings', icon: '⚙️' },
@@ -65,7 +67,7 @@ export default function MobileSidebar() {
           {/* Logo */}
           <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
             <div className="flex items-center">
-              <div className="text-2xl mr-2">🥛</div>
+              {/* <div className="text-2xl mr-2"><Image src="/logo.png" width="75" height="75" className="object-cover" alt="Logo" /></div> */}
               <div>
                 <h1 className="text-lg font-bold text-gray-900">Vedida Farms</h1>
                 <p className="text-xs text-gray-500">Admin Portal</p>

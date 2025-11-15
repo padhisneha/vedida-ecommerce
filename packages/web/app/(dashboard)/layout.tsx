@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import Sidebar from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
+import { showToast } from '@/lib/toast';
+import Image from 'next/image';
 
 export default function DashboardLayout({
   children,
@@ -18,7 +20,7 @@ export default function DashboardLayout({
     if (!isLoading && !isAuthenticated) {
       router.push('/login');
     } else if (!isLoading && !isAdmin) {
-      alert('Access denied. Admin privileges required.');
+      showToast.error('Access denied. Admin privileges required.');
       router.push('/login');
     }
   }, [isAuthenticated, isLoading, isAdmin, router]);
@@ -27,7 +29,7 @@ export default function DashboardLayout({
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="text-4xl mb-4 animate-pulse">🥛</div>
+          <div className="text-4xl mb-4 animate-pulse"><Image src="/logo.png" width={160} height={160} className="mx-auto object-contain drop-shadow-xl" alt="Logo" /></div>
           <div className="text-lg text-gray-600">Loading dashboard...</div>
         </div>
       </div>

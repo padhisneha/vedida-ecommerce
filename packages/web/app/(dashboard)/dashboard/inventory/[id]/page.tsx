@@ -13,6 +13,7 @@ import {
   formatCurrency,
   formatDate,
 } from '@ecommerce/shared';
+import { showToast } from '@/lib/toast';
 
 export default function ProductDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -20,6 +21,10 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -61,7 +66,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
       }
     } catch (error) {
       console.error('Error loading product:', error);
-      alert('Failed to load product details');
+      showToast.error('Failed to load product details');
     } finally {
       setLoading(false);
     }
@@ -78,27 +83,51 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
     if (!product) return;
 
     if (!formData.name.trim()) {
-      alert('Please enter product name');
-      return;
+        showToast.error('Please enter product name');
+        return;
     }
 
     setSaving(true);
+    const toastId = showToast.loading('Saving product...');
+    
     try {
-      const calculatedPrice = calculatePriceWithTax();
+        const calculatedPrice = calculatePriceWithTax();
 
-      await updateProduct(product.id, {
+        // Upload image if new image is selected
+        let imageUrl = product.imageUrl;
+        if (imageFile) {
+        showToast.loading('Uploading image...', { id: toastId });
+        const uploadedUrl = await handleImageUpload();
+        if (uploadedUrl) {
+            imageUrl = uploadedUrl;
+        }
+        }
+
+        const updateData: any = {
         ...formData,
         price: calculatedPrice,
-      });
+        };
 
-      alert('✅ Product updated successfully!');
-      setEditing(false);
-      await loadProduct();
-    } catch (error) {
-      console.error('Error updating product:', error);
-      alert('❌ Failed to update product');
+        if (imageUrl) {
+        updateData.imageUrl = imageUrl;
+        }
+
+        showToast.loading('Updating product details...', { id: toastId });
+        await updateProduct(product.id, updateData);
+
+        showToast.dismiss(toastId);
+        showToast.success('Product updated successfully!');
+        
+        setEditing(false);
+        setImageFile(null);
+        setImagePreview(null);
+        await loadProduct();
+    } catch (error: any) {
+        console.error('Error updating product:', error);
+        showToast.dismiss(toastId);
+        showToast.error(`Failed to update product: ${error.message || 'Unknown error'}`);
     } finally {
-      setSaving(false);
+        setSaving(false);
     }
   };
 
@@ -106,18 +135,28 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
     if (!product) return;
 
     if (!confirm(`Are you sure you want to delete "${product.name}"? This action cannot be undone.`)) {
-      return;
+        return;
     }
 
     setSaving(true);
+    const toastId = showToast.loading('Deleting product...');
+    
     try {
-      await deleteProduct(product.id);
-      alert('✅ Product deleted successfully!');
-      router.push('/dashboard/inventory');
-    } catch (error) {
-      console.error('Error deleting product:', error);
-      alert('❌ Failed to delete product');
-      setSaving(false);
+        // Delete image first if exists
+        if (product.imageUrl) {
+        const { deleteImage } = await import('@ecommerce/shared');
+        await deleteImage(product.imageUrl);
+        }
+        
+        await deleteProduct(product.id);
+        showToast.dismiss(toastId);
+        showToast.success('Product deleted successfully!');
+        router.push('/dashboard/inventory');
+    } catch (error: any) {
+        console.error('Error deleting product:', error);
+        showToast.dismiss(toastId);
+        showToast.error('Failed to delete product');
+        setSaving(false);
     }
   };
 
@@ -125,18 +164,85 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
     if (!product) return;
 
     setSaving(true);
+    const toastId = showToast.loading('Updating stock status...');
+    
     try {
-      await updateProduct(product.id, {
+        await updateProduct(product.id, {
         inStock: !product.inStock,
-      });
-      alert(`✅ Product marked as ${!product.inStock ? 'in stock' : 'out of stock'}!`);
-      await loadProduct();
+        });
+        
+        showToast.dismiss(toastId);
+        showToast.success(`Product marked as ${!product.inStock ? 'in stock' : 'out of stock'}!`);
+        await loadProduct();
     } catch (error) {
-      console.error('Error toggling stock:', error);
-      alert('❌ Failed to update stock status');
+        console.error('Error toggling stock:', error);
+        showToast.dismiss(toastId);
+        showToast.error('Failed to update stock status');
     } finally {
-      setSaving(false);
+        setSaving(false);
     }
+  };
+
+  const handleImageUpload = async (): Promise<string | null> => {
+    if (!imageFile || !product) return null;
+
+    setUploadingImage(true);
+    try {
+        console.log('📤 Starting image upload...');
+        
+        const { uploadImage, generateProductImagePath, deleteImage } = await import('@ecommerce/shared');
+        
+        // Delete old image if exists
+        if (product.imageUrl) {
+            console.log('🗑️ Deleting old image...');
+            try {
+                await deleteImage(product.imageUrl);
+            } catch (error) {
+                console.warn('⚠️ Could not delete old image:', error);
+            }
+        }
+
+        // Upload new image
+        const path = generateProductImagePath(product.id, imageFile.name);
+        console.log('Upload path:', path);
+        
+        const downloadURL = await uploadImage(imageFile, path);
+        
+        console.log('✅ Image uploaded:', downloadURL);
+        return downloadURL;
+    } catch (error: any) {
+        console.error('❌ Image upload error:', error);
+        showToast.error(`Image upload failed: ${error.message}`);
+        return null;
+    } finally {
+        setUploadingImage(false);
+    }
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+        showToast.error('Please select an image file');
+        return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+        showToast.error('Image size must be less than 5MB');
+        return;
+    }
+
+    setImageFile(file);
+    
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
   };
 
   if (loading) {
@@ -321,6 +427,66 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                       e.g., 1 for 1 liter, 500 for 500 grams
                     </p>
                   </div>
+                </div>
+              </div>
+
+              {/* Product Image Upload */}
+              <div className="card">
+                <h2 className="text-lg font-bold text-gray-900 mb-4">
+                    🖼️ Product Image
+                </h2>
+                <div className="space-y-4">
+                    {/* Image Preview */}
+                    <div className="h-64 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
+                    {imagePreview ? (
+                        <img
+                        src={imagePreview}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                        />
+                    ) : product.imageUrl ? (
+                        <img
+                        src={product.imageUrl}
+                        alt={product.name}
+                        className="w-full h-full object-cover"
+                        />
+                    ) : (
+                        <div className="text-8xl">📦</div>
+                    )}
+                    </div>
+
+                    {/* File Input */}
+                    <div>
+                    <label className="label">Upload New Image</label>
+                    <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                        className="block w-full text-sm text-gray-500
+                        file:mr-4 file:py-2 file:px-4
+                        file:rounded-lg file:border-0
+                        file:text-sm file:font-semibold
+                        file:bg-primary-50 file:text-primary-700
+                        hover:file:bg-primary-100
+                        cursor-pointer"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                        PNG, JPG, JPEG up to 5MB
+                    </p>
+                    </div>
+
+                    {imagePreview && (
+                    <button
+                        type="button"
+                        onClick={() => {
+                        setImageFile(null);
+                        setImagePreview(null);
+                        }}
+                        className="btn-secondary text-sm"
+                    >
+                        ✕ Remove Selected Image
+                    </button>
+                    )}
                 </div>
               </div>
 

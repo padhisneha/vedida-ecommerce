@@ -15,6 +15,7 @@ import {
   formatCurrency,
   formatDate,
 } from '@ecommerce/shared';
+import { showToast } from '@/lib/toast';
 
 export default function CustomerDetailPage({ params }: { params: { id: string } }) {
   const [customer, setCustomer] = useState<User | null>(null);
@@ -58,7 +59,7 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
       console.log('✅ Loaded customer data');
     } catch (error) {
       console.error('Error loading customer data:', error);
-      alert('Failed to load customer details');
+      showToast.error('Failed to load customer details');
     } finally {
       setLoading(false);
     }

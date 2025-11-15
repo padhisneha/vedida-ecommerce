@@ -8,6 +8,7 @@ import {
   UserRole,
   formatDate,
 } from '@ecommerce/shared';
+import { showToast } from '@/lib/toast';
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<User[]>([]);
@@ -29,7 +30,7 @@ export default function CustomersPage() {
       console.log('✅ Loaded customers:', customersOnly.length);
     } catch (error) {
       console.error('Error loading customers:', error);
-      alert('Failed to load customers');
+      showToast.error('Failed to load customers');
     } finally {
       setLoading(false);
     }

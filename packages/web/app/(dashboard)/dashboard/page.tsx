@@ -17,6 +17,7 @@ import {
   formatCurrency,
   formatDate,
 } from '@ecommerce/shared';
+import { showToast } from '@/lib/toast';
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -187,7 +188,7 @@ export default function DashboardPage() {
       await loadDashboardData();
     } catch (error) {
       console.error('Error generating orders:', error);
-      alert('❌ Failed to generate orders. Please try again.');
+      showToast.error('Failed to generate orders. Please try again.');
     } finally {
       setGenerating(false);
     }
@@ -230,7 +231,7 @@ export default function DashboardPage() {
     <div className="p-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">
-          Welcome back, {user?.name || 'Admin'}! 👋
+          Welcome, {user?.name || 'Admin'}! 
         </h1>
         <p className="text-gray-600 mt-2">
           Here's what's happening with your business today
@@ -245,7 +246,7 @@ export default function DashboardPage() {
               <p className="text-sm font-medium text-gray-600">Active Orders</p>
               <p className="text-3xl font-bold text-gray-900 mt-2">{activeOrders.length}</p>
               <p className="text-xs text-green-600 mt-2">
-                {orders.filter(o => o.status === OrderStatus.PENDING).length} pending
+                {orders.filter(o => o.status === OrderStatus.PENDING).length} pending approval
               </p>
             </div>
             <div className="text-4xl">📦</div>
