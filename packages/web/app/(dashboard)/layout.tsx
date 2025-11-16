@@ -7,23 +7,28 @@ import Sidebar from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
 import { showToast } from '@/lib/toast';
 import Image from 'next/image';
+import { UserRole } from '@ecommerce/shared';
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { isAuthenticated, isLoading, isAdmin } = useAuth();
+  const { user, isAuthenticated, isLoading, isAdmin } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push('/login');
     } else if (!isLoading && !isAdmin) {
-      showToast.error('Access denied. Admin privileges required.');
-      router.push('/login');
+      if (user && user.role === UserRole.DELIVERY_PARTNER) {
+        router.push('/delivery');
+      } else {
+        showToast.error('Access denied. Admin privileges required.');
+        router.push('/login');
+      }
     }
-  }, [isAuthenticated, isLoading, isAdmin, router]);
+  }, [user, isAuthenticated, isLoading, isAdmin, router]);
 
   if (isLoading) {
     return (

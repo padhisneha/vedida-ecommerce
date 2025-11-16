@@ -50,15 +50,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             console.log('User role:', userData.role);
             
             // Check if user is admin
-            if (userData.role === UserRole.ADMIN || userData.role === 'admin') {
+            if (userData.role === UserRole.ADMIN) {
               console.log('✅ User is admin, granting access');
               setUser(userData);
+            } else if (userData.role === UserRole.DELIVERY_PARTNER) {
+              console.log('✅ User is delivery partner, granting access');
+              setUser(userData);
             } else {
-              // Not an admin, sign out
-              console.log('⚠️ User is not an admin. Role:', userData.role);
+              // Not an admin or delivery partner, sign out
+              console.log('⚠️ User is not an admin or delivery partner. Role:', userData.role);
               setUser(null);
               await signOut(auth);
-              showToast.error('Access denied. Admin privileges required.');
+              showToast.error('Access denied. Admin or Delivery Partner privileges required.');
             }
           } else {
             console.log('❌ User document not found in Firestore for UID:', firebaseUser.uid);
@@ -90,7 +93,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     user,
     isAuthenticated: !!user,
     isLoading,
-    isAdmin: user?.role === UserRole.ADMIN || user?.role === 'admin',
+    isAdmin: user?.role === UserRole.ADMIN,
     logout,
   };
 

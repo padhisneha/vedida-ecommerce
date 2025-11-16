@@ -12,10 +12,11 @@ import {
 import { initializeApp } from '@/lib/firebase';
 import { showToast } from '@/lib/toast';
 import Image from 'next/image';
+import { UserRole } from '@ecommerce/shared';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otp, setOtp] = useState('');
   const [verificationId, setVerificationId] = useState<ConfirmationResult | null>(null);
@@ -25,11 +26,18 @@ export default function LoginPage() {
 
   // Redirect if already authenticated
   useEffect(() => {
-    if (!authLoading && isAuthenticated) {
-      console.log('✅ Already authenticated, redirecting to dashboard');
-      router.push('/dashboard');
+    if (!authLoading && isAuthenticated && user) {
+      console.log('✅ Authenticated, redirecting based on role:', user.role);
+      
+      if (user.role === UserRole.DELIVERY_PARTNER) {
+        router.push('/delivery');
+      } else if (user.role === UserRole.ADMIN) {
+        router.push('/dashboard');
+      } else {
+        showToast.error('This portal is for admin and delivery partners only');
+      }
     }
-  }, [isAuthenticated, authLoading, router]);
+  }, [isAuthenticated, authLoading, user, router]);
 
   // Initialize Firebase and reCAPTCHA
   useEffect(() => {
@@ -189,8 +197,8 @@ export default function LoginPage() {
         <div className="max-w-md w-full">
           <div className="text-center mb-8">
             <div className="text-6xl mb-4"><Image src="/logo.png" width="160" height={160} className="mx-auto object-contain drop-shadow-xl" alt="Logo" /></div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Vedida Farms Admin
+            <h1 className="text-3xl font-bold text-gray-900 mb-2 whitespace-nowrap">
+              Vedida Farms Dashboard
             </h1>
             <p className="text-gray-600">
               {verificationId ? 'Enter the OTP sent to your phone' : 'Login with your phone number'}
@@ -228,7 +236,7 @@ export default function LoginPage() {
 
                 <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                   <p className="text-sm text-blue-800">
-                    Admin access only. Use your registered admin phone number.
+                    Use your registered phone number to login.
                   </p>
                 </div>
 
@@ -297,7 +305,7 @@ export default function LoginPage() {
 
           <div className="mt-6 text-center">
             <p className="text-xs text-gray-500">
-              Admin access only • Secured by Firebase Authentication
+               • Admin and Delivery Partners access only • 
             </p>
           </div>
         </div>

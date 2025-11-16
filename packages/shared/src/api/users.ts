@@ -9,7 +9,7 @@ import {
   getDocs,
   orderBy,
 } from 'firebase/firestore';
-import { getFirebaseFirestore } from './firebase-config';
+import { getFirebaseFirestore, getFirebaseAuth } from './firebase-config';
 import { User, UserAddress, COLLECTIONS, UserRole, Order, SubscriptionStatus } from '../types';
 import { getCurrentTimestamp } from '../utils';
 

@@ -3,11 +3,16 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useState } from 'react';
 import MobileSidebar from './MobileSidebar';
+import DeliveryMobileSidebar from './DeliveryMobileSidebar';
 import Image from 'next/image';
+import { UserRole } from '@ecommerce/shared';
 
 export default function Header() {
   const { user, logout } = useAuth();
   const [showDropdown, setShowDropdown] = useState(false);
+  
+  const isDeliveryPartner = user?.role === UserRole.DELIVERY_PARTNER;
+  const roleLabel = isDeliveryPartner ? 'Delivery Partner' : 'Administrator';
 
   const handleLogout = async () => {
     if (confirm('Are you sure you want to logout?')) {
@@ -21,11 +26,13 @@ export default function Header() {
         <div className="flex items-center justify-between">
           {/* Left: Mobile menu + Logo */}
           <div className="flex items-center gap-4">
-            <MobileSidebar />
+            {isDeliveryPartner ? <DeliveryMobileSidebar /> : <MobileSidebar />}
             
             {/* Mobile logo */}
             <div className="flex items-center md:hidden">
-              <div className="text-2xl mr-2"><Image src="/logo.png" width={80} height={80} className="object-cover" alt="Logo" /></div>
+              <div className="text-2xl mr-2">
+                <Image src="/logo.png" width={80} height={80} className="object-cover" alt="Logo" />
+              </div>
               <div>
                 <h1 className="text-lg font-bold text-gray-900">Vedida Farms</h1>
               </div>
@@ -46,16 +53,18 @@ export default function Header() {
                 onClick={() => setShowDropdown(!showDropdown)}
                 className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-100 transition-colors"
               >
-                <div className="w-9 h-9 bg-primary-500 rounded-full flex items-center justify-center">
+                <div className={`w-9 h-9 rounded-full flex items-center justify-center ${
+                  isDeliveryPartner ? 'bg-blue-500' : 'bg-primary-500'
+                }`}>
                   <span className="text-white font-semibold text-sm">
-                    {user?.name?.charAt(0).toUpperCase() || 'A'}
+                    {user?.name?.charAt(0).toUpperCase() || (isDeliveryPartner ? 'D' : 'A')}
                   </span>
                 </div>
                 <div className="text-left hidden sm:block">
                   <p className="text-sm font-medium text-gray-900">
-                    {user?.name || 'Admin'}
+                    {user?.name || (isDeliveryPartner ? 'Partner' : 'Admin')}
                   </p>
-                  <p className="text-xs text-gray-500">Administrator</p>
+                  <p className="text-xs text-gray-500">{roleLabel}</p>
                 </div>
                 <svg
                   className="w-4 h-4 text-gray-400 hidden sm:block"
@@ -82,10 +91,13 @@ export default function Header() {
                   <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
                     <div className="px-4 py-3 border-b border-gray-200">
                       <p className="text-sm font-medium text-gray-900">
-                        {user?.name || 'Admin User'}
+                        {user?.name || (isDeliveryPartner ? 'Delivery Partner' : 'Admin User')}
                       </p>
                       <p className="text-xs text-gray-500 mt-1">
                         {user?.email || user?.phoneNumber}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {roleLabel}
                       </p>
                     </div>
 
