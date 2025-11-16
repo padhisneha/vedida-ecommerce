@@ -8,15 +8,20 @@ import {
   updateDeliveryPartner,
   toggleDeliveryPartnerStatus,
   getDeliveryPartnerStats,
+  getAllOrders,
   User,
+  Order,
+  OrderStatus,
   formatDate,
   formatCurrency,
+  formatDateTime,
 } from '@ecommerce/shared';
 import { showToast } from '@/lib/toast';
 
 export default function DeliveryPartnerDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const [partner, setPartner] = useState<User | null>(null);
+  const [assignedOrders, setAssignedOrders] = useState<Order[]>([]);
   const [stats, setStats] = useState({
     totalAssigned: 0,
     totalDelivered: 0,
@@ -24,6 +29,7 @@ export default function DeliveryPartnerDetailPage({ params }: { params: { id: st
     successRate: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [loadingOrders, setLoadingOrders] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -37,6 +43,7 @@ export default function DeliveryPartnerDetailPage({ params }: { params: { id: st
   useEffect(() => {
     loadPartner();
     loadStats();
+    loadAssignedOrders();
   }, [params.id]);
 
   const loadPartner = async () => {
@@ -65,6 +72,34 @@ export default function DeliveryPartnerDetailPage({ params }: { params: { id: st
       setStats(data);
     } catch (error) {
       console.error('Error loading stats:', error);
+    }
+  };
+
+  const loadAssignedOrders = async () => {
+    setLoadingOrders(true);
+    try {
+      const allOrders = await getAllOrders();
+      
+      // Filter orders assigned to this partner, excluding DELIVERED and CANCELLED
+      const partnerOrders = allOrders.filter(
+        order => 
+          order.deliveryPartnerId === params.id &&
+          order.status !== OrderStatus.DELIVERED &&
+          order.status !== OrderStatus.CANCELLED
+      );
+      
+      // Sort by scheduled delivery date (earliest first)
+      partnerOrders.sort((a, b) => 
+        a.scheduledDeliveryDate.toMillis() - b.scheduledDeliveryDate.toMillis()
+      );
+      
+      setAssignedOrders(partnerOrders);
+      console.log('✅ Loaded assigned orders:', partnerOrders.length);
+    } catch (error) {
+      console.error('Error loading assigned orders:', error);
+      showToast.error('Failed to load assigned orders');
+    } finally {
+      setLoadingOrders(false);
     }
   };
 
@@ -125,6 +160,57 @@ export default function DeliveryPartnerDetailPage({ params }: { params: { id: st
     }
   };
 
+  const getStatusBadge = (status: OrderStatus) => {
+    const styles = {
+      [OrderStatus.PENDING]: 'bg-yellow-100 text-yellow-800',
+      [OrderStatus.CONFIRMED]: 'bg-blue-100 text-blue-800',
+      [OrderStatus.OUT_FOR_DELIVERY]: 'bg-purple-100 text-purple-800',
+      [OrderStatus.DELIVERED]: 'bg-green-100 text-green-800',
+      [OrderStatus.CANCELLED]: 'bg-red-100 text-red-800',
+    };
+
+    const labels = {
+      [OrderStatus.PENDING]: 'Pending',
+      [OrderStatus.CONFIRMED]: 'Confirmed',
+      [OrderStatus.OUT_FOR_DELIVERY]: 'Out for Delivery',
+      [OrderStatus.DELIVERED]: 'Delivered',
+      [OrderStatus.CANCELLED]: 'Cancelled',
+    };
+
+    return (
+      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${styles[status]}`}>
+        {labels[status]}
+      </span>
+    );
+  };
+
+  const getStatusIcon = (status: OrderStatus) => {
+    const icons = {
+      [OrderStatus.PENDING]: '⏳',
+      [OrderStatus.CONFIRMED]: '✅',
+      [OrderStatus.OUT_FOR_DELIVERY]: '🚚',
+      [OrderStatus.DELIVERED]: '📦',
+      [OrderStatus.CANCELLED]: '❌',
+    };
+    return icons[status];
+  };
+
+  const isDeliveryToday = (order: Order) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const deliveryDate = order.scheduledDeliveryDate.toDate();
+    deliveryDate.setHours(0, 0, 0, 0);
+    return deliveryDate.getTime() === today.getTime();
+  };
+
+  const isDeliveryOverdue = (order: Order) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const deliveryDate = order.scheduledDeliveryDate.toDate();
+    deliveryDate.setHours(0, 0, 0, 0);
+    return deliveryDate.getTime() < today.getTime();
+  };
+
   if (loading) {
     return (
       <div className="p-8">
@@ -149,6 +235,13 @@ export default function DeliveryPartnerDetailPage({ params }: { params: { id: st
       </div>
     );
   }
+
+  // Group orders by status
+  const todayOrders = assignedOrders.filter(isDeliveryToday);
+  const overdueOrders = assignedOrders.filter(isDeliveryOverdue);
+  const upcomingOrders = assignedOrders.filter(
+    order => !isDeliveryToday(order) && !isDeliveryOverdue(order)
+  );
 
   return (
     <div className="p-8">
@@ -354,20 +447,237 @@ export default function DeliveryPartnerDetailPage({ params }: { params: { id: st
             </div>
           )}
 
-          {/* Recent Deliveries - Placeholder */}
+          {/* Assigned Deliveries */}
           <div className="card">
-            <h2 className="text-lg font-bold text-gray-900 mb-4">
-              📦 Recent Deliveries
-            </h2>
-            <div className="text-center py-8 text-gray-500">
-              <p>Recent deliveries will appear here</p>
-              <p className="text-sm mt-2">(Feature coming soon)</p>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-gray-900">
+                📦 Assigned Deliveries
+              </h2>
+              <span className="text-sm font-medium text-gray-600">
+                {assignedOrders.length} active order(s)
+              </span>
             </div>
+
+            {loadingOrders ? (
+              <div className="text-center py-8">
+                <div className="text-4xl mb-4 animate-pulse">📦</div>
+                <p className="text-gray-600">Loading assigned orders...</p>
+              </div>
+            ) : assignedOrders.length === 0 ? (
+              <div className="text-center py-12 bg-gray-50 rounded-lg">
+                <div className="text-5xl mb-4">📭</div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  No Active Deliveries
+                </h3>
+                <p className="text-gray-600">
+                  This partner has no active orders assigned
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Overdue Orders */}
+                {overdueOrders.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-red-600 font-semibold">⚠️ Overdue</span>
+                      <span className="text-sm text-red-600">({overdueOrders.length})</span>
+                    </div>
+                    <div className="space-y-3">
+                      {overdueOrders.map((order) => (
+                        <div
+                          key={order.id}
+                          className="bg-red-50 border border-red-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                        >
+                          <div className="flex items-start justify-between mb-3">
+                            <div>
+                              <Link
+                                href={`/dashboard/orders/${order.id}`}
+                                className="font-semibold text-gray-900 hover:text-primary-600 text-lg"
+                              >
+                                {order.orderNumber}
+                              </Link>
+                              <p className="text-sm text-gray-600 mt-1">
+                                {order.items.length} item(s) • {formatCurrency(order.totalAmount)}
+                              </p>
+                            </div>
+                            {getStatusBadge(order.status)}
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-3 mb-3">
+                            <div>
+                              <p className="text-xs text-gray-600">Customer</p>
+                              <p className="text-sm font-medium text-gray-900">
+                                {order.deliveryAddress.label}
+                              </p>
+                              <p className="text-xs text-gray-600">{order.deliveryAddress.city}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-600">Scheduled Delivery</p>
+                              <p className="text-sm font-medium text-red-600">
+                                {formatDate(order.scheduledDeliveryDate)}
+                              </p>
+                              <p className="text-xs text-red-600">Overdue!</p>
+                            </div>
+                          </div>
+
+                          <div className="pt-3 border-t border-red-200">
+                            <p className="text-xs text-gray-600 mb-1">Address</p>
+                            <p className="text-sm text-gray-900">
+                              {order.deliveryAddress.apartment && `${order.deliveryAddress.apartment}, `}
+                              {order.deliveryAddress.street}, {order.deliveryAddress.city} - {order.deliveryAddress.pincode}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Today's Orders */}
+                {todayOrders.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-blue-600 font-semibold">📅 Today</span>
+                      <span className="text-sm text-blue-600">({todayOrders.length})</span>
+                    </div>
+                    <div className="space-y-3">
+                      {todayOrders.map((order) => (
+                        <div
+                          key={order.id}
+                          className="bg-blue-50 border border-blue-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                        >
+                          <div className="flex items-start justify-between mb-3">
+                            <div>
+                              <Link
+                                href={`/dashboard/orders/${order.id}`}
+                                className="font-semibold text-gray-900 hover:text-primary-600 text-lg"
+                              >
+                                {order.orderNumber}
+                              </Link>
+                              <p className="text-sm text-gray-600 mt-1">
+                                {order.items.length} item(s) • {formatCurrency(order.totalAmount)}
+                              </p>
+                            </div>
+                            {getStatusBadge(order.status)}
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-3 mb-3">
+                            <div>
+                              <p className="text-xs text-gray-600">Customer</p>
+                              <p className="text-sm font-medium text-gray-900">
+                                {order.deliveryAddress.label}
+                              </p>
+                              <p className="text-xs text-gray-600">{order.deliveryAddress.city}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-600">Order Type</p>
+                              <p className="text-sm font-medium text-gray-900">
+                                {order.type === 'one_time' ? 'One-Time' : 'Subscription'}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="pt-3 border-t border-blue-200">
+                            <p className="text-xs text-gray-600 mb-1">Address</p>
+                            <p className="text-sm text-gray-900">
+                              {order.deliveryAddress.apartment && `${order.deliveryAddress.apartment}, `}
+                              {order.deliveryAddress.street}, {order.deliveryAddress.city} - {order.deliveryAddress.pincode}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Upcoming Orders */}
+                {upcomingOrders.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-gray-700 font-semibold">📆 Upcoming</span>
+                      <span className="text-sm text-gray-600">({upcomingOrders.length})</span>
+                    </div>
+                    <div className="space-y-3">
+                      {upcomingOrders.map((order) => (
+                        <div
+                          key={order.id}
+                          className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                        >
+                          <div className="flex items-start justify-between mb-3">
+                            <div>
+                              <Link
+                                href={`/dashboard/orders/${order.id}`}
+                                className="font-semibold text-gray-900 hover:text-primary-600 text-lg"
+                              >
+                                {order.orderNumber}
+                              </Link>
+                              <p className="text-sm text-gray-600 mt-1">
+                                {order.items.length} item(s) • {formatCurrency(order.totalAmount)}
+                              </p>
+                            </div>
+                            {getStatusBadge(order.status)}
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-3 mb-3">
+                            <div>
+                              <p className="text-xs text-gray-600">Customer</p>
+                              <p className="text-sm font-medium text-gray-900">
+                                {order.deliveryAddress.label}
+                              </p>
+                              <p className="text-xs text-gray-600">{order.deliveryAddress.city}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-600">Scheduled Delivery</p>
+                              <p className="text-sm font-medium text-gray-900">
+                                {formatDate(order.scheduledDeliveryDate)}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="pt-3 border-t border-gray-200">
+                            <p className="text-xs text-gray-600 mb-1">Address</p>
+                            <p className="text-sm text-gray-900">
+                              {order.deliveryAddress.apartment && `${order.deliveryAddress.apartment}, `}
+                              {order.deliveryAddress.street}, {order.deliveryAddress.city} - {order.deliveryAddress.pincode}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
         {/* Right Column: Quick Info */}
         <div className="space-y-6">
+          {/* Active Deliveries Summary */}
+          <div className="card">
+            <h2 className="text-lg font-bold text-gray-900 mb-4">
+              📊 Active Summary
+            </h2>
+            <div className="space-y-3">
+              {overdueOrders.length > 0 && (
+                <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
+                  <span className="text-sm font-medium text-red-900">Overdue</span>
+                  <span className="text-lg font-bold text-red-600">{overdueOrders.length}</span>
+                </div>
+              )}
+              {todayOrders.length > 0 && (
+                <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+                  <span className="text-sm font-medium text-blue-900">Today</span>
+                  <span className="text-lg font-bold text-blue-600">{todayOrders.length}</span>
+                </div>
+              )}
+              <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span className="text-sm font-medium text-gray-700">Upcoming</span>
+                <span className="text-lg font-bold text-gray-900">{upcomingOrders.length}</span>
+              </div>
+            </div>
+          </div>
+
           {/* Partner ID */}
           <div className="card">
             <h2 className="text-lg font-bold text-gray-900 mb-4">

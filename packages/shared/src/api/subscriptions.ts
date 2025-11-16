@@ -366,6 +366,29 @@ export const assignDeliveryPartnerToSubscription = async (
 };
 
 /**
+ * Bulk update subscription status
+ */
+export const bulkUpdateSubscriptionStatus = async (
+  subscriptionIds: string[],
+  status: SubscriptionStatus
+): Promise<{ success: number; failed: number }> => {
+  let success = 0;
+  let failed = 0;
+
+  for (const subscriptionId of subscriptionIds) {
+    try {
+      await updateSubscriptionStatus(subscriptionId, status);
+      success++;
+    } catch (error) {
+      console.error(`Failed to update subscription ${subscriptionId}:`, error);
+      failed++;
+    }
+  }
+
+  return { success, failed };
+};
+
+/**
  * Bulk accept pending subscriptions
  */
 export const bulkAcceptSubscriptions = async (

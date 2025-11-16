@@ -7,8 +7,11 @@ import {
   getOrderByIdWithProducts,
   updateOrderStatus,
   assignDeliveryPartner,
+  getUsersByRole,
   Order,
   OrderStatus,
+  UserRole,
+  User,
   formatCurrency,
   formatDate,
   formatDateTime,
@@ -20,23 +23,45 @@ import { showToast } from '@/lib/toast';
 export default function OrderDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const [order, setOrder] = useState<Order | null>(null);
+  const [deliveryPartners, setDeliveryPartners] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingPartners, setLoadingPartners] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [assigning, setAssigning] = useState(false);
+  const [selectedPartner, setSelectedPartner] = useState('');
 
   useEffect(() => {
     loadOrder();
+    loadDeliveryPartners();
   }, [params.id]);
 
   const loadOrder = async () => {
     try {
       const data = await getOrderByIdWithProducts(params.id);
       setOrder(data);
+      setSelectedPartner(data.deliveryPartnerId || '');
       console.log('✅ Loaded order:', data);
     } catch (error) {
       console.error('Error loading order:', error);
       showToast.error('Failed to load order details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadDeliveryPartners = async () => {
+    setLoadingPartners(true);
+    try {
+      const partners = await getUsersByRole(UserRole.DELIVERY_PARTNER);
+      // Filter only active delivery partners
+      const activePartners = partners.filter(partner => partner.isActive !== false);
+      setDeliveryPartners(activePartners);
+      console.log('✅ Loaded delivery partners:', activePartners);
+    } catch (error) {
+      console.error('Error loading delivery partners:', error);
+      showToast.error('Failed to load delivery partners');
+    } finally {
+      setLoadingPartners(false);
     }
   };
 
@@ -69,6 +94,38 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
       showToast.error('Failed to update order status');
     } finally {
       setUpdating(false);
+    }
+  };
+
+  const handleAssignPartner = async () => {
+    if (!order || !selectedPartner) {
+      showToast.error('Please select a delivery partner');
+      return;
+    }
+
+    const partner = deliveryPartners.find(p => p.id === selectedPartner);
+    if (!partner) return;
+
+    const partnerName = partner.name || partner.phoneNumber;
+    
+    if (!confirm(`Assign ${partnerName} to this order?`)) {
+      return;
+    }
+
+    setAssigning(true);
+    const toastId = showToast.loading('Assigning delivery partner...');
+
+    try {
+      await assignDeliveryPartner(order.id, partner.id, partnerName);
+      showToast.dismiss(toastId);
+      showToast.success(`${partnerName} has been assigned to this order!`);
+      await loadOrder();
+    } catch (error) {
+      console.error('Error assigning delivery partner:', error);
+      showToast.dismiss(toastId);
+      showToast.error('Failed to assign delivery partner');
+    } finally {
+      setAssigning(false);
     }
   };
 
@@ -119,6 +176,19 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
       [OrderStatus.CANCELLED]: '❌',
     };
     return icons[status];
+  };
+
+  const getPartnerDisplayName = (partner: User) => {
+    return partner.name || partner.phoneNumber;
+  };
+
+  const getVehicleIcon = (vehicleType?: string) => {
+    const icons: Record<string, string> = {
+      bike: '🏍️',
+      car: '🚗',
+      bicycle: '🚲',
+    };
+    return vehicleType ? icons[vehicleType] || '🚚' : '🚚';
   };
 
   if (loading) {
@@ -457,18 +527,116 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
               <h2 className="text-lg font-bold text-gray-900 mb-4">
                 👤 Delivery Partner
               </h2>
-              <select className="input mb-3" disabled>
-                <option>Assign delivery partner...</option>
-                <option>Rajesh Kumar</option>
-                <option>Amit Sharma</option>
-                <option>Priya Patel</option>
-              </select>
-              <button className="btn-secondary w-full" disabled>
-                💼 Assign Partner (Coming Soon)
-              </button>
-              <p className="text-xs text-gray-500 mt-2">
-                Delivery partner management will be available soon
-              </p>
+              
+              {order.deliveryPartnerName ? (
+                <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-2xl">✅</span>
+                    <p className="font-semibold text-green-900">Assigned</p>
+                  </div>
+                  <p className="text-lg font-bold text-green-800">
+                    {order.deliveryPartnerName}
+                  </p>
+                  <p className="text-xs text-gray-600 mt-1">
+                    ID: {order.deliveryPartnerId?.slice(0, 12)}...
+                  </p>
+                </div>
+              ) : (
+                <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-sm text-yellow-800">
+                    ⚠️ No delivery partner assigned yet
+                  </p>
+                </div>
+              )}
+
+              {loadingPartners ? (
+                <div className="text-center py-4">
+                  <div className="text-sm text-gray-600">Loading partners...</div>
+                </div>
+              ) : deliveryPartners.length === 0 ? (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-800">
+                    ❌ No active delivery partners available
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <select 
+                    className="input mb-3"
+                    value={selectedPartner}
+                    onChange={(e) => setSelectedPartner(e.target.value)}
+                    disabled={assigning}
+                  >
+                    <option value="">Select delivery partner...</option>
+                    {deliveryPartners.map((partner) => {
+                      const assignedPartner = deliveryPartners.find(p => p.id === partner.id);
+                      return (
+                        <option key={partner.id} value={partner.id}>
+                          {getVehicleIcon(partner.vehicleType)} {getPartnerDisplayName(partner)}
+                          {partner.totalDeliveries ? ` (${partner.totalDeliveries} deliveries)` : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  
+                  {selectedPartner && (() => {
+                    const partner = deliveryPartners.find(p => p.id === selectedPartner);
+                    return partner ? (
+                      <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span>{getVehicleIcon(partner.vehicleType)}</span>
+                          <span className="font-semibold text-blue-900">
+                            {getPartnerDisplayName(partner)}
+                          </span>
+                        </div>
+                        {partner.phoneNumber && (
+                          <p className="text-blue-700">📱 {partner.phoneNumber}</p>
+                        )}
+                        {partner.vehicleNumber && (
+                          <p className="text-blue-700">🚗 {partner.vehicleNumber}</p>
+                        )}
+                        {partner.totalDeliveries !== undefined && (
+                          <p className="text-blue-700">📦 {partner.totalDeliveries} deliveries completed</p>
+                        )}
+                      </div>
+                    ) : null;
+                  })()}
+                  
+                  <button 
+                    className="btn-secondary w-full flex items-center justify-center gap-2"
+                    onClick={handleAssignPartner}
+                    disabled={assigning || !selectedPartner}
+                  >
+                    <span>💼</span>
+                    <span>
+                      {assigning 
+                        ? 'Assigning...' 
+                        : order.deliveryPartnerName 
+                        ? 'Reassign Partner' 
+                        : 'Assign Partner'}
+                    </span>
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Show delivery partner info for completed orders */}
+          {(order.status === OrderStatus.DELIVERED || order.status === OrderStatus.CANCELLED) && 
+           order.deliveryPartnerName && (
+            <div className="card">
+              <h2 className="text-lg font-bold text-gray-900 mb-4">
+                👤 Delivery Partner
+              </h2>
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <p className="text-sm text-gray-600 mb-1">Assigned To</p>
+                <p className="text-lg font-bold text-gray-900">
+                  {order.deliveryPartnerName}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  ID: {order.deliveryPartnerId?.slice(0, 12)}...
+                </p>
+              </div>
             </div>
           )}
 

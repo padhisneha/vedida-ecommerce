@@ -343,31 +343,30 @@ export const generateSubscriptionOrders = async (
     where('status', '==', 'active')
   );
   const subsSnapshot = await getDocs(subsQuery);
-
   let created = 0;
   let skipped = 0;
   const errors: string[] = [];
 
   for (const subDoc of subsSnapshot.docs) {
     const subscription = { id: subDoc.id, ...subDoc.data() } as any;
-
+    
     try {
       // Check if subscription should deliver on this date
       const startDate = subscription.startDate.toDate();
       const endDate = subscription.endDate?.toDate();
-
+      
       // Skip if delivery date is before subscription start
       if (deliveryDate < startDate) {
         skipped++;
         continue;
       }
-
+      
       // Skip if delivery date is after subscription end
       if (endDate && deliveryDate > endDate) {
         skipped++;
         continue;
       }
-
+      
       // Check if subscription is paused
       if (subscription.pausedUntil) {
         const pausedUntil = subscription.pausedUntil.toDate();
@@ -376,10 +375,7 @@ export const generateSubscriptionOrders = async (
           continue;
         }
       }
-
-      // Check frequency (simplified - assumes daily for now)
-      // For production, you'd need to check alternate_days and weekly schedules
-
+      
       // Check if order already exists
       const exists = await checkSubscriptionOrderExists(subscription.id, deliveryDate);
       if (exists) {
@@ -387,13 +383,13 @@ export const generateSubscriptionOrders = async (
         skipped++;
         continue;
       }
-
+      
       // Check frequency
       if (!shouldDeliverToday(subscription, deliveryDate)) {
         skipped++;
         continue;
       }
-
+      
       // Get product details for pricing
       const itemsWithPrices = await Promise.all(
         subscription.items.map(async (item: any) => {
@@ -405,21 +401,21 @@ export const generateSubscriptionOrders = async (
           };
         })
       );
-
+      
       // Calculate total
       const totalAmount = itemsWithPrices.reduce(
         (sum, item) => sum + item.price * item.quantity,
         0
       );
-
+      
       // Create order
       const orderNumber = await generateOrderNumber();
       const timestamp = getCurrentTimestamp();
-
       const scheduledDelivery = new Date(deliveryDate);
       scheduledDelivery.setHours(7, 0, 0, 0);
-
-      await addDoc(collection(db, COLLECTIONS.ORDERS), {
+      
+      // Prepare order data
+      const orderData: any = {
         orderNumber,
         userId: subscription.userId,
         type: 'subscription',
@@ -431,8 +427,16 @@ export const generateSubscriptionOrders = async (
         scheduledDeliveryDate: Timestamp.fromDate(scheduledDelivery),
         createdAt: timestamp,
         updatedAt: timestamp,
-      });
-
+      };
+      
+      // Add delivery partner info if assigned to subscription
+      if (subscription.deliveryPartnerId && subscription.deliveryPartnerName) {
+        orderData.deliveryPartnerId = subscription.deliveryPartnerId;
+        orderData.deliveryPartnerName = subscription.deliveryPartnerName;
+      }
+      
+      await addDoc(collection(db, COLLECTIONS.ORDERS), orderData);
+      
       created++;
       console.log(`✅ Created order for subscription ${subscription.id}`);
     } catch (error: any) {
@@ -440,7 +444,7 @@ export const generateSubscriptionOrders = async (
       errors.push(`Subscription ${subscription.id.slice(0, 8)}: ${error.message}`);
     }
   }
-
+  
   return { created, skipped, errors };
 };
 

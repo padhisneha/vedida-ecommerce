@@ -18,7 +18,9 @@ const navigation: NavItem[] = [
   { name: 'Delivery Partners', href: '/dashboard/delivery-partners', icon: '🚚' },
   { name: 'Inventory', href: '/dashboard/inventory', icon: '🏪' },
   { name: 'Reports', href: '/dashboard/reports', icon: '📈' },
+  { name: 'Bulk Updates', href: '/dashboard/bulk-update', icon: '⚡' },
   { name: 'Settings', href: '/dashboard/settings', icon: '⚙️' },
+  { name: 'Delivery', href: '/dashboard/settings', icon: '⚙️' },
 ];
 
 export default function Sidebar() {

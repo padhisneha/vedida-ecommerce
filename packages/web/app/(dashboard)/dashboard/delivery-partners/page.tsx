@@ -288,26 +288,13 @@ export default function DeliveryPartnersPage() {
                           {partner.isActive !== false ? 'Active' : 'Suspended'}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
                           <Link
                             href={`/dashboard/delivery-partners/${partner.id}`}
                             className="text-primary-600 hover:text-primary-700 font-medium text-sm"
                           >
-                            View
+                            View Details →
                           </Link>
-                          <span className="text-gray-300">|</span>
-                          <button
-                            onClick={() => handleToggleStatus(partner.id, partner.isActive !== false)}
-                            className={`font-medium text-sm ${
-                              partner.isActive !== false
-                                ? 'text-red-600 hover:text-red-700'
-                                : 'text-green-600 hover:text-green-700'
-                            }`}
-                          >
-                            {partner.isActive !== false ? 'Suspend' : 'Activate'}
-                          </button>
-                        </div>
                       </td>
                     </tr>
                   ))}
