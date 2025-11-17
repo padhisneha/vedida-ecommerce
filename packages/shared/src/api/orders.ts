@@ -425,6 +425,8 @@ export const generateSubscriptionOrders = async (
         deliveryAddress: subscription.deliveryAddress,
         status: 'pending',
         scheduledDeliveryDate: Timestamp.fromDate(scheduledDelivery),
+        paymentMethod: subscription.paymentMethod,
+        paymentStatus: subscription.paymentStatus,
         createdAt: timestamp,
         updatedAt: timestamp,
       };
@@ -460,6 +462,62 @@ export const assignDeliveryPartner = async (
   await updateDoc(doc(db, COLLECTIONS.ORDERS, orderId), {
     deliveryPartnerId: partnerId,
     deliveryPartnerName: partnerName,
+    updatedAt: getCurrentTimestamp(),
+  });
+};
+
+/**
+ * Update order delivery notes
+ */
+export const updateOrderNotes = async (
+  orderId: string, 
+  notes: string
+): Promise<void> => {
+  const db = getFirebaseFirestore();
+  await updateDoc(doc(db, COLLECTIONS.ORDERS, orderId), {
+    deliveryNotes: notes,
+    updatedAt: getCurrentTimestamp(),
+  });
+};
+
+/**
+ * Update scheduled delivery date
+ */
+export const updateScheduledDeliveryDate = async (
+  orderId: string,
+  newDate: Date
+): Promise<void> => {
+  const db = getFirebaseFirestore();
+  await updateDoc(doc(db, COLLECTIONS.ORDERS, orderId), {
+    scheduledDeliveryDate: Timestamp.fromDate(newDate),
+    updatedAt: getCurrentTimestamp(),
+  });
+};
+
+/**
+ * Update payment method
+ */
+export const updatePaymentMethod = async (
+  orderId: string,
+  paymentMethod: 'cod' | 'online' | 'upi'
+): Promise<void> => {
+  const db = getFirebaseFirestore();
+  await updateDoc(doc(db, COLLECTIONS.ORDERS, orderId), {
+    paymentMethod: paymentMethod,
+    updatedAt: getCurrentTimestamp(),
+  });
+};
+
+/**
+ * Update payment status
+ */
+export const updatePaymentStatus = async (
+  orderId: string,
+  paymentStatus: 'pending' | 'paid' | 'failed'
+): Promise<void> => {
+  const db = getFirebaseFirestore();
+  await updateDoc(doc(db, COLLECTIONS.ORDERS, orderId), {
+    paymentStatus: paymentStatus,
     updatedAt: getCurrentTimestamp(),
   });
 };

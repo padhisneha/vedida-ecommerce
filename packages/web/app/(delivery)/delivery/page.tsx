@@ -505,9 +505,11 @@ export default function DeliveryPartnerHomePage() {
                 {/* Header */}
                 <div className="flex items-start justify-between mb-4">
                   <div>
-                    <h3 className="text-xl font-bold text-gray-900">
-                      {order.orderNumber}
+                    <Link href={`/delivery/orders/${order.id}`}>
+                    <h3 className="text-xl font-bold text-gray-900 hover:text-blue-600 transition-colors cursor-pointer">
+                        <span>👁️</span> {order.orderNumber}
                     </h3>
+                    </Link>
                     <p className="text-sm text-gray-600 mt-1">
                       {order.items.length} item(s) • {formatCurrency(order.totalAmount)}
                     </p>

@@ -7,11 +7,16 @@ import {
   getOrderByIdWithProducts,
   updateOrderStatus,
   assignDeliveryPartner,
+  updateOrderNotes,
+  updateScheduledDeliveryDate,
+  updatePaymentMethod,
+  updatePaymentStatus,
   getUsersByRole,
   Order,
   OrderStatus,
   UserRole,
   User,
+  getUserById,
   formatCurrency,
   formatDate,
   formatDateTime,
@@ -19,6 +24,7 @@ import {
   DELIVERY_FEE,
 } from '@ecommerce/shared';
 import { showToast } from '@/lib/toast';
+import { generateOrderInvoicePDF } from '@/lib/invoice-generator';
 
 export default function OrderDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -29,6 +35,21 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
   const [updating, setUpdating] = useState(false);
   const [assigning, setAssigning] = useState(false);
   const [selectedPartner, setSelectedPartner] = useState('');
+  const [customer, setCustomer] = useState<User | null>(null);
+
+  // New states for editable fields
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [notesValue, setNotesValue] = useState('');
+  const [savingNotes, setSavingNotes] = useState(false);
+  
+  const [editingDate, setEditingDate] = useState(false);
+  const [dateValue, setDateValue] = useState('');
+  const [savingDate, setSavingDate] = useState(false);
+
+  const [editingPayment, setEditingPayment] = useState(false);
+  const [paymentMethodValue, setPaymentMethodValue] = useState<'cod' | 'online' | 'upi'>('cod');
+  const [paymentStatusValue, setPaymentStatusValue] = useState<'pending' | 'paid' | 'failed'>('pending');
+  const [savingPayment, setSavingPayment] = useState(false);
 
   useEffect(() => {
     loadOrder();
@@ -40,6 +61,13 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
       const data = await getOrderByIdWithProducts(params.id);
       setOrder(data);
       setSelectedPartner(data.deliveryPartnerId || '');
+
+      // Load customer details
+      if (data) {
+        const customerData = await getUserById(data.userId);
+        setCustomer(customerData || null);
+      }
+
       console.log('✅ Loaded order:', data);
     } catch (error) {
       console.error('Error loading order:', error);
@@ -129,6 +157,89 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
     }
   };
 
+  const handleSaveNotes = async () => {
+    if (!order) return;
+
+    setSavingNotes(true);
+    const toastId = showToast.loading('Saving delivery notes...');
+
+    try {
+      await updateOrderNotes(order.id, notesValue.trim());
+      showToast.dismiss(toastId);
+      showToast.success('Delivery notes updated successfully!');
+      setEditingNotes(false);
+      await loadOrder();
+    } catch (error) {
+      console.error('Error updating notes:', error);
+      showToast.dismiss(toastId);
+      showToast.error('Failed to update delivery notes');
+    } finally {
+      setSavingNotes(false);
+    }
+  };
+
+  const handleSaveDate = async () => {
+    if (!order) return;
+
+    const newDate = new Date(dateValue);
+    const orderDate = order.createdAt.toDate();
+    
+    // Validate: new date should not be earlier than order date
+    if (newDate < orderDate) {
+      showToast.error('Delivery date cannot be earlier than order date');
+      return;
+    }
+
+    if (!confirm(`Change delivery date to ${formatDate(newDate)}?`)) {
+      return;
+    }
+
+    setSavingDate(true);
+    const toastId = showToast.loading('Updating delivery date...');
+
+    try {
+      await updateScheduledDeliveryDate(order.id, newDate);
+      showToast.dismiss(toastId);
+      showToast.success('Delivery date updated successfully!');
+      setEditingDate(false);
+      await loadOrder();
+    } catch (error) {
+      console.error('Error updating date:', error);
+      showToast.dismiss(toastId);
+      showToast.error('Failed to update delivery date');
+    } finally {
+      setSavingDate(false);
+    }
+  };
+
+  const handleSavePayment = async () => {
+    if (!order) return;
+
+    if (!confirm('Update payment information?')) {
+      return;
+    }
+
+    setSavingPayment(true);
+    const toastId = showToast.loading('Updating payment information...');
+
+    try {
+      // Update both method and status
+      await updatePaymentMethod(order.id, paymentMethodValue);
+      await updatePaymentStatus(order.id, paymentStatusValue);
+
+      showToast.dismiss(toastId);
+      showToast.success('Payment information updated successfully!');
+      setEditingPayment(false);
+      await loadOrder();
+    } catch (error) {
+      console.error('Error updating payment:', error);
+      showToast.dismiss(toastId);
+      showToast.error('Failed to update payment information');
+    } finally {
+      setSavingPayment(false);
+    }
+  };
+
   const calculateTax = () => {
     if (!order) return { subtotal: 0, cgst: 0, sgst: 0, totalTax: 0 };
 
@@ -189,6 +300,36 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
       bicycle: '🚲',
     };
     return vehicleType ? icons[vehicleType] || '🚚' : '🚚';
+  };
+
+  const getPaymentMethodLabel = (method?: string) => {
+    const labels: Record<string, string> = {
+      cod: '💵 Cash on Delivery',
+      online: '💳 Online Payment',
+      upi: '🔳 UPI Payment',
+    };
+    return labels[method || 'cod'] || '💵 Cash on Delivery';
+  };
+
+  const getPaymentStatusBadge = (status?: string) => {
+    const styles: Record<string, string> = {
+      pending: 'bg-yellow-100 text-yellow-800',
+      paid: 'bg-green-100 text-green-800',
+      failed: 'bg-red-100 text-red-800',
+    };
+    
+    const labels: Record<string, string> = {
+      pending: '⏳ Pending',
+      paid: '✅ Paid',
+      failed: '❌ Failed',
+    };
+    
+    const statusKey = status || 'pending';
+    return (
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${styles[statusKey]}`}>
+        {labels[statusKey]}
+      </span>
+    );
   };
 
   if (loading) {
@@ -400,40 +541,202 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
           {/* Delivery Address */}
           <div className="card">
             <h2 className="text-lg font-bold text-gray-900 mb-4">
-              📍 Delivery Address
+              📍  Customer & Delivery Address
             </h2>
-            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-              <p className="font-semibold text-gray-900 mb-2 text-lg">
-                {order.deliveryAddress.label}
-              </p>
-              <p className="text-gray-700">
-                {order.deliveryAddress.apartment && `${order.deliveryAddress.apartment}, `}
-                {order.deliveryAddress.street}
-              </p>
-              <p className="text-gray-700">
-                {order.deliveryAddress.city}, {order.deliveryAddress.state} -{' '}
-                {order.deliveryAddress.pincode}
-              </p>
-              {order.deliveryAddress.landmark && (
-                <p className="text-gray-600 text-sm mt-2">
-                  📍 Landmark: {order.deliveryAddress.landmark}
+
+            {/* Customer Information */}
+            <div className="mb-4 pb-4 border-b border-gray-200">
+              <p className="text-sm text-gray-600 mb-2">Customer Details</p>
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="font-semibold text-gray-900 text-lg">
+                    {customer?.name || 'Customer'}
+                  </p>
+                  <p className="text-gray-600 flex items-center gap-2 mt-1">
+                    <span>📱</span>
+                    <a 
+                      href={`tel:${customer?.phoneNumber}`}
+                      className="hover:text-primary-600 transition-colors"
+                    >
+                      {customer?.phoneNumber}
+                    </a>
+                  </p>
+                  {customer?.email && (
+                    <p className="text-gray-600 flex items-center gap-2 mt-1">
+                      <span>📧</span>
+                      <a 
+                        href={`mailto:${customer.email}`}
+                        className="hover:text-primary-600 transition-colors"
+                      >
+                        {customer.email}
+                      </a>
+                    </p>
+                  )}
+                </div>
+                {/* Quick call button for delivery partners */}
+                <a
+                  href={`tel:${customer?.phoneNumber}`}
+                  className="btn-secondary text-sm px-3 py-1.5"
+                >
+                  📞 Call
+                </a>
+              </div>
+            </div>
+
+            {/* Delivery Address */}
+            <div>
+              <p className="text-sm text-gray-600 mb-2">Delivery Address</p>
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <p className="font-semibold text-gray-900 mb-2 text-lg">
+                  {order.deliveryAddress.label}
                 </p>
-              )}
+                <p className="text-gray-700">
+                  {order.deliveryAddress.apartment && `${order.deliveryAddress.apartment}, `}
+                  {order.deliveryAddress.street}
+                </p>
+                <p className="text-gray-700">
+                  {order.deliveryAddress.city}, {order.deliveryAddress.state} -{' '}
+                  {order.deliveryAddress.pincode}
+                </p>
+                {order.deliveryAddress.landmark && (
+                  <p className="text-gray-600 text-sm mt-2">
+                    📍 Landmark: {order.deliveryAddress.landmark}
+                  </p>
+                )}
+              </div>
+              
+              {/* Map/Directions Link */}
+              <div className="mt-3">
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                    `${order.deliveryAddress.street}, ${order.deliveryAddress.city}, ${order.deliveryAddress.state} ${order.deliveryAddress.pincode}`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-secondary w-full flex items-center justify-center gap-2"
+                >
+                  <span>🗺️</span>
+                  <span>Open in Google Maps</span>
+                </a>
+              </div>
             </div>
           </div>
 
-          {/* Delivery Information */}
+          {/* Delivery Notes Section */}
+          <div className="card">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-gray-900">
+                📝 Delivery Notes
+              </h2>
+              {!editingNotes && order.status !== OrderStatus.DELIVERED && order.status !== OrderStatus.CANCELLED && (
+                <button
+                  onClick={() => setEditingNotes(true)}
+                  className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                >
+                  ✏️ Edit
+                </button>
+              )}
+            </div>
+
+            {editingNotes ? (
+              <div>
+                <textarea
+                  className="input min-h-[100px]"
+                  value={notesValue}
+                  onChange={(e) => setNotesValue(e.target.value)}
+                  placeholder="Add delivery instructions or special notes..."
+                  disabled={savingNotes}
+                />
+                <div className="flex gap-2 mt-3">
+                  <button
+                    onClick={handleSaveNotes}
+                    disabled={savingNotes}
+                    className="btn-primary flex items-center gap-2"
+                  >
+                    <span>💾</span>
+                    <span>{savingNotes ? 'Saving...' : 'Save Notes'}</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditingNotes(false);
+                      setNotesValue(order.deliveryNotes || '');
+                    }}
+                    disabled={savingNotes}
+                    className="btn-secondary"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 min-h-[60px]">
+                {order.deliveryNotes ? (
+                  <p className="text-gray-900 whitespace-pre-wrap">{order.deliveryNotes}</p>
+                ) : (
+                  <p className="text-gray-500 italic">No delivery notes added</p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Delivery Information with Editable Date and Payment */}
           <div className="card">
             <h2 className="text-lg font-bold text-gray-900 mb-4">
               🚚 Delivery Information
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Editable Scheduled Delivery Date */}
               <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-600 mb-1">Scheduled Delivery</p>
-                <p className="font-semibold text-gray-900">
-                  {formatDate(order.scheduledDeliveryDate)}
-                </p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm text-gray-600">Scheduled Delivery</p>
+                  {!editingDate && order.status !== OrderStatus.DELIVERED && order.status !== OrderStatus.CANCELLED && (
+                    <button
+                      onClick={() => setEditingDate(true)}
+                      className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+                    >
+                      📅 Change
+                    </button>
+                  )}
+                </div>
+                
+                {editingDate ? (
+                  <div>
+                    <input
+                      type="date"
+                      className="input text-sm"
+                      value={dateValue}
+                      onChange={(e) => setDateValue(e.target.value)}
+                      min={order.createdAt.toDate().toISOString().split('T')[0]}
+                      disabled={savingDate}
+                    />
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        onClick={handleSaveDate}
+                        disabled={savingDate}
+                        className="text-xs px-3 py-1 bg-primary-500 text-white rounded hover:bg-primary-600 disabled:opacity-50"
+                      >
+                        {savingDate ? 'Saving...' : 'Save'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditingDate(false);
+                          const date = order.scheduledDeliveryDate.toDate();
+                          setDateValue(date.toISOString().split('T')[0]);
+                        }}
+                        disabled={savingDate}
+                        className="text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="font-semibold text-gray-900">
+                    {formatDate(order.scheduledDeliveryDate)}
+                  </p>
+                )}
               </div>
+
               {order.deliveredAt && (
                 <div className="bg-green-50 p-4 rounded-lg border border-green-200">
                   <p className="text-sm text-green-700 mb-1">Delivered On</p>
@@ -442,18 +745,87 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                   </p>
                 </div>
               )}
+              
               <div className="bg-gray-50 p-4 rounded-lg">
                 <p className="text-sm text-gray-600 mb-1">Order Type</p>
                 <p className="font-semibold text-gray-900">
                   {order.type === 'one_time' ? 'One-Time Order' : 'Subscription'}
                 </p>
               </div>
+              
+              {/* Editable Payment Method */}
               <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-600 mb-1">Payment Method</p>
-                <p className="font-semibold text-gray-900">💵 Cash on Delivery</p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm text-gray-600">Payment Method</p>
+                  {!editingPayment && (
+                    <button
+                      onClick={() => setEditingPayment(true)}
+                      className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+                    >
+                      ✏️ Edit
+                    </button>
+                  )}
+                </div>
+                
+                {editingPayment ? (
+                  <div>
+                    <select
+                      className="input text-sm mb-2"
+                      value={paymentMethodValue}
+                      onChange={(e) => setPaymentMethodValue(e.target.value as 'cod' | 'online' | 'upi')}
+                      disabled={savingPayment}
+                    >
+                      <option value="cod">💵 Cash on Delivery</option>
+                      <option value="online">💳 Online Payment</option>
+                      <option value="upi">🔳 UPI Payment</option>
+                    </select>
+                    
+                    <select
+                      className="input text-sm mb-2"
+                      value={paymentStatusValue}
+                      onChange={(e) => setPaymentStatusValue(e.target.value as 'pending' | 'paid' | 'failed')}
+                      disabled={savingPayment}
+                    >
+                      <option value="pending">⏳ Pending</option>
+                      <option value="paid">✅ Paid</option>
+                      <option value="failed">❌ Failed</option>
+                    </select>
+                    
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleSavePayment}
+                        disabled={savingPayment}
+                        className="text-xs px-3 py-1 bg-primary-500 text-white rounded hover:bg-primary-600 disabled:opacity-50"
+                      >
+                        {savingPayment ? 'Saving...' : 'Save'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditingPayment(false);
+                          setPaymentMethodValue(order.paymentMethod || 'cod');
+                          setPaymentStatusValue(order.paymentStatus || 'pending');
+                        }}
+                        disabled={savingPayment}
+                        className="text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="font-semibold text-gray-900">
+                      {getPaymentMethodLabel(order.paymentMethod)}
+                    </p>
+                    <div className="mt-2">
+                      {getPaymentStatusBadge(order.paymentStatus)}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
+
         </div>
 
         {/* Right Column: Actions & Summary */}
@@ -701,10 +1073,26 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                     {formatCurrency(order.totalAmount)}
                   </span>
                 </div>
-                <p className="text-xs text-gray-500 mt-1 text-right">
-                  Payment: Cash on Delivery
-                </p>
               </div>
+
+              <div className="pt-3">
+                <button
+                  onClick={async () => {
+                    try {
+                      await generateOrderInvoicePDF(order, taxBreakdown);
+                      showToast.success('Invoice downloaded successfully!');
+                    } catch (error) {
+                      console.error('Error generating invoice:', error);
+                      showToast.error('Failed to generate invoice PDF');
+                    }
+                  }}
+                  className="btn-secondary w-full flex items-center justify-center gap-2"
+                >
+                  <span>📄</span>
+                  <span>Download Invoice PDF</span>
+                </button>
+              </div>
+
             </div>
           </div>
 

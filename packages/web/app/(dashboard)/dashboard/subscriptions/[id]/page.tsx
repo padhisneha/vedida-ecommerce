@@ -6,6 +6,8 @@ import Link from 'next/link';
 import {
   getSubscriptionWithProducts,
   updateSubscriptionStatus,
+  updateSubscriptionPaymentMethod,
+  updateSubscriptionPaymentStatus,
   assignDeliveryPartnerToSubscription,
   getUsersByRole,
   Subscription,
@@ -13,11 +15,13 @@ import {
   SubscriptionFrequency,
   UserRole,
   User,
+  getUserById,
   formatCurrency,
   formatDate,
   formatDateTime,
 } from '@ecommerce/shared';
 import { showToast } from '@/lib/toast';
+import { generateSubscriptionInvoicePDF } from '@/lib/invoice-generator';
 
 export default function SubscriptionDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -28,6 +32,12 @@ export default function SubscriptionDetailPage({ params }: { params: { id: strin
   const [updating, setUpdating] = useState(false);
   const [assigning, setAssigning] = useState(false);
   const [selectedPartner, setSelectedPartner] = useState('');
+  const [customer, setCustomer] = useState<User | null>(null);
+
+  const [editingPayment, setEditingPayment] = useState(false);
+  const [paymentMethodValue, setPaymentMethodValue] = useState<'cod' | 'online' | 'upi'>('cod');
+  const [paymentStatusValue, setPaymentStatusValue] = useState<'pending' | 'paid' | 'failed'>('pending');
+  const [savingPayment, setSavingPayment] = useState(false);
 
   useEffect(() => {
     loadSubscription();
@@ -39,6 +49,13 @@ export default function SubscriptionDetailPage({ params }: { params: { id: strin
       const data = await getSubscriptionWithProducts(params.id);
       setSubscription(data);
       setSelectedPartner(data.deliveryPartnerId || '');
+
+      // Load customer details
+      if (data) {
+        const customerData = await getUserById(data.userId);
+        setCustomer(customerData || null);
+      }
+
       console.log('✅ Loaded subscription:', data);
     } catch (error) {
       console.error('Error loading subscription:', error);
@@ -139,6 +156,34 @@ export default function SubscriptionDetailPage({ params }: { params: { id: strin
     }
   };
 
+  const handleSavePayment = async () => {
+    if (!subscription) return;
+
+    if (!confirm('Update payment information?')) {
+    return;
+    }
+
+    setSavingPayment(true);
+    const toastId = showToast.loading('Updating payment information...');
+
+    try {
+        // Update both method and status
+        await updateSubscriptionPaymentMethod(subscription.id, paymentMethodValue);
+        await updateSubscriptionPaymentStatus(subscription.id, paymentStatusValue);
+
+        showToast.dismiss(toastId);
+        showToast.success('Payment information updated successfully!');
+        setEditingPayment(false);
+        await loadSubscription();
+    } catch (error) {
+        console.error('Error updating payment:', error);
+        showToast.dismiss(toastId);
+        showToast.error('Failed to update payment information');
+    } finally {
+        setSavingPayment(false);
+    }
+  };
+
   const getStatusColor = (status: SubscriptionStatus) => {
     const colors = {
         [SubscriptionStatus.PENDING]: 'bg-yellow-500',
@@ -183,6 +228,36 @@ export default function SubscriptionDetailPage({ params }: { params: { id: strin
     return vehicleType ? icons[vehicleType] || '🚚' : '🚚';
   };
 
+  const getPaymentMethodLabel = (method?: string) => {
+    const labels: Record<string, string> = {
+      cod: '💵 Cash on Delivery',
+      online: '💳 Online Payment',
+      upi: '🔳 UPI Payment',
+    };
+    return labels[method || 'cod'] || '💵 Cash on Delivery';
+  };
+
+  const getPaymentStatusBadge = (status?: string) => {
+    const styles: Record<string, string> = {
+      pending: 'bg-yellow-100 text-yellow-800',
+      paid: 'bg-green-100 text-green-800',
+      failed: 'bg-red-100 text-red-800',
+    };
+    
+    const labels: Record<string, string> = {
+      pending: '⏳ Pending',
+      paid: '✅ Paid',
+      failed: '❌ Failed',
+    };
+    
+    const statusKey = status || 'pending';
+    return (
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${styles[statusKey]}`}>
+        {labels[statusKey]}
+      </span>
+    );
+  };
+
   const calculatePerDeliveryAmount = () => {
     if (!subscription) return 0;
     return subscription.items.reduce((total, item) => {
@@ -210,6 +285,33 @@ export default function SubscriptionDetailPage({ params }: { params: { id: strin
       default:
         return 0;
     }
+  };
+
+  const calculateTax = () => {
+    if (!subscription) return { subtotal: 0, cgst: 0, sgst: 0, totalTax: 0 };
+
+    let subtotal = 0;
+    let cgst = 0;
+    let sgst = 0;
+
+    subscription.items.forEach((item) => {
+      if (item.product) {
+        const itemSubtotal = item.product.priceExcludingTax * item.quantity;
+        const itemCGST = (itemSubtotal * item.product.taxCGST) / 100;
+        const itemSGST = (itemSubtotal * item.product.taxSGST) / 100;
+
+        subtotal += itemSubtotal;
+        cgst += itemCGST;
+        sgst += itemSGST;
+      }
+    });
+
+    return {
+      subtotal,
+      cgst,
+      sgst,
+      totalTax: cgst + sgst,
+    };
   };
 
   if (loading) {
@@ -376,25 +478,84 @@ export default function SubscriptionDetailPage({ params }: { params: { id: strin
           {/* Delivery Address */}
           <div className="card">
             <h2 className="text-lg font-bold text-gray-900 mb-4">
-              📍 Delivery Address
+              📍  Customer & Delivery Address
             </h2>
-            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-              <p className="font-semibold text-gray-900 mb-2 text-lg">
-                {subscription.deliveryAddress.label}
-              </p>
-              <p className="text-gray-700">
-                {subscription.deliveryAddress.apartment && `${subscription.deliveryAddress.apartment}, `}
-                {subscription.deliveryAddress.street}
-              </p>
-              <p className="text-gray-700">
-                {subscription.deliveryAddress.city}, {subscription.deliveryAddress.state} -{' '}
-                {subscription.deliveryAddress.pincode}
-              </p>
-              {subscription.deliveryAddress.landmark && (
-                <p className="text-gray-600 text-sm mt-2">
-                  📍 Landmark: {subscription.deliveryAddress.landmark}
+
+            {/* Customer Information */}
+            <div className="mb-4 pb-4 border-b border-gray-200">
+              <p className="text-sm text-gray-600 mb-2">Customer Details</p>
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="font-semibold text-gray-900 text-lg">
+                    {customer?.name || 'Customer'}
+                  </p>
+                  <p className="text-gray-600 flex items-center gap-2 mt-1">
+                    <span>📱</span>
+                    <a 
+                      href={`tel:${customer?.phoneNumber}`}
+                      className="hover:text-primary-600 transition-colors"
+                    >
+                      {customer?.phoneNumber}
+                    </a>
+                  </p>
+                  {customer?.email && (
+                    <p className="text-gray-600 flex items-center gap-2 mt-1">
+                      <span>📧</span>
+                      <a 
+                        href={`mailto:${customer.email}`}
+                        className="hover:text-primary-600 transition-colors"
+                      >
+                        {customer.email}
+                      </a>
+                    </p>
+                  )}
+                </div>
+                {/* Quick call button for delivery partners */}
+                <a
+                  href={`tel:${customer?.phoneNumber}`}
+                  className="btn-secondary text-sm px-3 py-1.5"
+                >
+                  📞 Call
+                </a>
+              </div>
+            </div>
+
+            {/* Delivery Address */}
+            <div>
+              <p className="text-sm text-gray-600 mb-2">Delivery Address</p>
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <p className="font-semibold text-gray-900 mb-2 text-lg">
+                  {subscription.deliveryAddress.label}
                 </p>
-              )}
+                <p className="text-gray-700">
+                  {subscription.deliveryAddress.apartment && `${subscription.deliveryAddress.apartment}, `}
+                  {subscription.deliveryAddress.street}
+                </p>
+                <p className="text-gray-700">
+                  {subscription.deliveryAddress.city}, {subscription.deliveryAddress.state} -{' '}
+                  {subscription.deliveryAddress.pincode}
+                </p>
+                {subscription.deliveryAddress.landmark && (
+                  <p className="text-gray-600 text-sm mt-2">
+                    📍 Landmark: {subscription.deliveryAddress.landmark}
+                  </p>
+                )}
+              </div>
+              
+              {/* Map/Directions Link */}
+              <div className="mt-3">
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                    `${subscription.deliveryAddress.street}, ${subscription.deliveryAddress.city}, ${subscription.deliveryAddress.state} ${subscription.deliveryAddress.pincode}`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-secondary w-full flex items-center justify-center gap-2"
+                >
+                  <span>🗺️</span>
+                  <span>Open in Google Maps</span>
+                </a>
+              </div>
             </div>
           </div>
 
@@ -648,19 +809,117 @@ export default function SubscriptionDetailPage({ params }: { params: { id: strin
 
                   <div className="border-t border-gray-200 pt-3">
                     <div className="flex justify-between items-center">
-                      <span className="font-bold text-gray-900">Total Amount Paid</span>
+                      <span className="font-bold text-gray-900">Total Amount </span>
                       <span className="font-bold text-primary-600 text-xl">
                         {formatCurrency(totalAmount)}
                       </span>
                     </div>
                     <p className="text-xs text-gray-500 mt-1 text-right">
-                      Upfront payment
+                      &nbsp;
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1 text-right">
+                     &nbsp; 
                     </p>
                   </div>
                 </>
               )}
             </div>
+
+            {/* Editable Payment Method */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                    
+                    <p className="text-sm text-gray-600">Payment Method</p>
+                    {!editingPayment && (
+                    <button
+                        onClick={() => setEditingPayment(true)}
+                        className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+                    >
+                        ✏️ Edit
+                    </button>
+                    )}
+                </div>
+            
+                {editingPayment ? (
+                <div>
+                    <select
+                        className="input text-sm mb-2"
+                        value={paymentMethodValue}
+                        onChange={(e) => setPaymentMethodValue(e.target.value as 'cod' | 'online' | 'upi')}
+                        disabled={savingPayment}
+                    >
+                        <option value="cod">💵 Cash on Delivery</option>
+                        <option value="online">💳 Online Payment</option>
+                        <option value="upi">🔳 UPI Payment</option>
+                    </select>
+                    
+                    <select
+                        className="input text-sm mb-2"
+                        value={paymentStatusValue}
+                        onChange={(e) => setPaymentStatusValue(e.target.value as 'pending' | 'paid' | 'failed')}
+                        disabled={savingPayment}
+                    >
+                        <option value="pending">⏳ Pending</option>
+                        <option value="paid">✅ Paid</option>
+                        <option value="failed">❌ Failed</option>
+                    </select>
+                    
+                    <div className="flex gap-2">
+                        <button
+                        onClick={handleSavePayment}
+                        disabled={savingPayment}
+                        className="text-xs px-3 py-1 bg-primary-500 text-white rounded hover:bg-primary-600 disabled:opacity-50"
+                        >
+                        {savingPayment ? 'Saving...' : 'Save'}
+                        </button>
+                        <button
+                        onClick={() => {
+                            setEditingPayment(false);
+                            setPaymentMethodValue(subscription.paymentMethod || 'cod');
+                            setPaymentStatusValue(subscription.paymentStatus || 'pending');
+                        }}
+                        disabled={savingPayment}
+                        className="text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                        >
+                        Cancel
+                        </button>
+                    </div>
+                    </div>
+                ) : (
+                    <div>
+                    <p className="font-semibold text-gray-900">
+                        {getPaymentMethodLabel(subscription.paymentMethod)}
+                    </p>
+                    <div className="mt-2">
+                        {getPaymentStatusBadge(subscription.paymentStatus)}
+                    </div>
+                    </div>
+                )}
+            </div>
+
+            {/* ADD THIS DOWNLOAD BUTTON */}
+            <div className="pt-3">
+            <button
+                onClick={async () => {
+                try {
+                    const taxBreakdown = calculateTax();
+                    await generateSubscriptionInvoicePDF(subscription, taxBreakdown);
+                    showToast.success('Subscription invoice downloaded successfully!');
+                } catch (error) {
+                    console.error('Error generating invoice:', error);
+                    showToast.error('Failed to generate invoice PDF');
+                }
+                }}
+                className="btn-secondary w-full flex items-center justify-center gap-2"
+            >
+                <span>📄</span>
+                <span>Download Invoice</span>
+            </button>
+            </div>
+
           </div>
+
+          
 
           {/* Status Info Cards */}
           {subscription.status === SubscriptionStatus.COMPLETED && (

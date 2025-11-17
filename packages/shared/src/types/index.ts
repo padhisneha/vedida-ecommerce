@@ -99,6 +99,22 @@ export interface Cart {
 }
 
 // ============================================================================
+// Payment Types
+// ============================================================================
+
+export enum PaymentMethod {
+  COD = 'cod',
+  ONLINE = 'online',
+  UPI = 'upi',
+}
+
+export enum PaymentStatus {
+  PENDING = 'pending',
+  PAID = 'paid',
+  FAILED = 'failed',
+}
+
+// ============================================================================
 // Subscription Types
 // ============================================================================
 
@@ -134,10 +150,15 @@ export interface Subscription {
   endDate?: Timestamp;
   pausedUntil?: Timestamp;
 
+  // Payment fields
+  paymentMethod: PaymentMethod;
+  paymentStatus?: PaymentStatus;
+  transactionId?: string;
+
   // Delivery Partner fields
   deliveryPartnerId?: string;
   deliveryPartnerName?: string;
-  
+
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -178,6 +199,11 @@ export interface Order {
   status: OrderStatus;
   scheduledDeliveryDate: Timestamp;
   deliveredAt?: Timestamp;
+
+  // Payment fields
+  paymentMethod: PaymentMethod;
+  paymentStatus?: PaymentStatus;
+  transactionId?: string;
 
   // Delivery Partner fields
   deliveryPartnerId?: string;

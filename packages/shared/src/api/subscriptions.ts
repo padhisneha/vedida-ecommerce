@@ -366,6 +366,34 @@ export const assignDeliveryPartnerToSubscription = async (
 };
 
 /**
+ * Update payment method
+ */
+export const updateSubscriptionPaymentMethod = async (
+  subscriptionId: string,
+  paymentMethod: 'cod' | 'online' | 'upi'
+): Promise<void> => {
+  const db = getFirebaseFirestore();
+  await updateDoc(doc(db, COLLECTIONS.SUBSCRIPTIONS, subscriptionId), {
+    paymentMethod: paymentMethod,
+    updatedAt: getCurrentTimestamp(),
+  });
+};
+
+/**
+ * Update payment status
+ */
+export const updateSubscriptionPaymentStatus = async (
+  subscriptionId: string,
+  paymentStatus: 'pending' | 'paid' | 'failed'
+): Promise<void> => {
+  const db = getFirebaseFirestore();
+  await updateDoc(doc(db, COLLECTIONS.SUBSCRIPTIONS, subscriptionId), {
+    paymentStatus: paymentStatus,
+    updatedAt: getCurrentTimestamp(),
+  });
+};
+
+/**
  * Bulk update subscription status
  */
 export const bulkUpdateSubscriptionStatus = async (

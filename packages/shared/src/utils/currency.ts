@@ -11,6 +11,13 @@ export const formatCurrency = (amount: number): string => {
 };
 
 /**
+ * Format price for Indian Rupees without currency symbol
+ */
+export const formatCurrencyForPDF = (amount: number): string => {
+  return `Rs. ${amount.toFixed(2)}`;
+};
+
+/**
  * Calculate total from items
  */
 export const calculateTotal = (items: Array<{ price: number; quantity: number }>): number => {
