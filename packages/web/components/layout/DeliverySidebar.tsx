@@ -12,6 +12,7 @@ interface NavItem {
 
 const navigation: NavItem[] = [
   { name: 'My Deliveries', href: '/delivery', icon: '📦' },
+  { name: 'Notifications', href: '/delivery/notifications', icon: '🔔' },
 ];
 
 export default function DeliverySidebar() {

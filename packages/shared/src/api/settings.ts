@@ -1,6 +1,6 @@
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { getFirebaseFirestore } from './firebase-config';
-import { AppSettings, DEFAULT_SETTINGS } from '../types/settings';
+import { AppSettings, DEFAULT_SETTINGS, DeliveryArea } from '../types/settings';
 import { getCurrentTimestamp } from '../utils';
 
 const SETTINGS_DOC_ID = 'app_settings';

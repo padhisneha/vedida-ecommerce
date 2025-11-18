@@ -22,6 +22,8 @@ import {
   formatDateTime,
   PLATFORM_FEE,
   DELIVERY_FEE,
+  NotificationType,
+  createNotification,
 } from '@ecommerce/shared';
 import { showToast } from '@/lib/toast';
 import { generateOrderInvoicePDF } from '@/lib/invoice-generator';
@@ -113,6 +115,38 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
 
     try {
       await updateOrderStatus(order.id, newStatus);
+
+      // Notify customer
+      if (newStatus === OrderStatus.CONFIRMED) {
+        await createNotification(
+          order.userId,
+          NotificationType.ORDER_CONFIRMED,
+          'Order Confirmed',
+          `Your order ${order.orderNumber} has been confirmed`,
+          { orderId: order.id, metadata: { orderNumber: order.orderNumber } }
+        );
+      }
+      
+      if (newStatus === OrderStatus.OUT_FOR_DELIVERY) {
+        await createNotification(
+          order.userId,
+          NotificationType.ORDER_OUT_FOR_DELIVERY,
+          'Order Out for Delivery',
+          `Your order ${order.orderNumber} is out for delivery`,
+          { orderId: order.id, metadata: { orderNumber: order.orderNumber } }
+        );
+      }
+      
+      if (newStatus === OrderStatus.DELIVERED) {
+        await createNotification(
+          order.userId,
+          NotificationType.ORDER_DELIVERED,
+          'Order Delivered',
+          `Your order ${order.orderNumber} has been delivered`,
+          { orderId: order.id, metadata: { orderNumber: order.orderNumber } }
+        );
+      }
+
       showToast.dismiss(toastId);
       showToast.success('Order status updated successfully!');
       await loadOrder();
@@ -145,6 +179,22 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
 
     try {
       await assignDeliveryPartner(order.id, partner.id, partnerName);
+
+      await createNotification(
+          partner.id,
+          NotificationType.ORDER_ASSIGNED,
+          'New Order Assigned',
+          `Order ${order.orderNumber} has been assigned to you for ${formatDate(order.scheduledDeliveryDate)}`,
+          { 
+            orderId: order.id, 
+            metadata: { 
+              orderNumber: order.orderNumber,
+              amount: order.totalAmount,
+              deliveryDate: order.scheduledDeliveryDate.toDate().toISOString(),
+            } 
+          }
+        );
+
       showToast.dismiss(toastId);
       showToast.success(`${partnerName} has been assigned to this order!`);
       await loadOrder();

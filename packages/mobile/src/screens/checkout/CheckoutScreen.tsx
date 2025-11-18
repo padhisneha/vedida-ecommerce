@@ -21,15 +21,20 @@ import {
   dateToTimestamp,
   TaxBreakdown,
   RAZORPAY_CONFIG,
+  PaymentMethod, 
+  PaymentStatus,
+  UserRole,
+  getUsersByRole,
+  NotificationType,
+  createNotification,
+  getOrderById,
 } from '@ecommerce/shared';
-
-type PaymentMethod = 'cod' | 'online';
 
 export const CheckoutScreen = ({ route, navigation }: any) => {
   const { cartItems, taxBreakdown, platformFee, deliveryFee, total } = route.params;
   const { user } = useAuthStore();
   const [selectedAddress, setSelectedAddress] = useState<UserAddress | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.COD);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -90,21 +95,32 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
       items: orderItems,
       totalAmount: total,
       deliveryAddress: selectedAddress,
+      paymentMethod: paymentMethod,
+      paymentStatus: paymentMethod === PaymentMethod.COD ? PaymentStatus.PENDING : PaymentStatus.PAID,
       status: OrderStatus.PENDING,
       scheduledDeliveryDate: dateToTimestamp(deliveryDate),
     };
 
     console.log('=== Order Creation Debug ===');
-    console.log('User ID:', user.id);
-    console.log('User Role:', user.role);
-    console.log('Order Type:', OrderType.ONE_TIME);
-    console.log('Status:', OrderStatus.PENDING);
-    console.log('Total Amount:', total);
     console.log('Full Order Data:', JSON.stringify(orderData, null, 2));
     console.log('========================');
 
     try {
       const orderId = await createOrder(orderData);
+
+      // Notify all admins
+      const admins = await getUsersByRole(UserRole.ADMIN);
+      const order = await getOrderById(orderId);
+      for (const admin of admins) {
+        await createNotification(
+          admin.id,
+          NotificationType.ORDER_PLACED,
+          'New Order Received',
+          `Order ${order?.orderNumber} placed for ${formatCurrency(total)}`,
+          { orderId, metadata: { orderNumber: order?.orderNumber, amount: total } }
+        );
+      }
+
       console.log('✅ Order created successfully:', orderId);
       return orderId;
     } catch (error: any) {
@@ -317,7 +333,7 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
               styles.paymentOption,
               paymentMethod === 'cod' && styles.paymentOptionActive,
             ]}
-            onPress={() => setPaymentMethod('cod')}
+            onPress={() => setPaymentMethod(PaymentMethod.COD)}
           >
             <View style={styles.paymentOptionContent}>
               <View style={styles.radioButton}>
@@ -339,7 +355,7 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
               styles.paymentOption,
               paymentMethod === 'online' && styles.paymentOptionActive,
             ]}
-            onPress={() => setPaymentMethod('online')}
+            onPress={() => setPaymentMethod(PaymentMethod.ONLINE)}
           >
             <View style={styles.paymentOptionContent}>
               <View style={styles.radioButton}>

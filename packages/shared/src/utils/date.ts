@@ -26,7 +26,7 @@ export const getCurrentTimestamp = (): Timestamp => {
  * Handles both Timestamp and number (milliseconds)
  */
 export const formatDate = (
-  timestamp: Timestamp | number,
+  timestamp: Timestamp | number | Date,
   locale: string = 'en-IN'
 ): string => {
   let date: Date;

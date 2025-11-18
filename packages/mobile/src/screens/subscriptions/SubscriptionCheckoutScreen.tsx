@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import RazorpayCheckout from 'react-native-razorpay';
-import { RAZORPAY_CONFIG } from '@ecommerce/shared';
+import { PaymentMethod, PaymentStatus, RAZORPAY_CONFIG } from '@ecommerce/shared';
 import {
   useAuthStore,
   formatCurrency,
@@ -20,9 +20,12 @@ import {
   SubscriptionItem,
   dateToTimestamp,
   formatDate,
+  UserRole,
+  createNotification,
+  NotificationType,
+  getUsersByRole,
+  getSubscriptionById,
 } from '@ecommerce/shared';
-
-type PaymentMethod = 'cod' | 'online';
 
 interface CheckoutItem {
   productId: string;
@@ -44,7 +47,7 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
 
   const { user } = useAuthStore();
   const [selectedAddress, setSelectedAddress] = useState<UserAddress | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.COD);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -143,6 +146,59 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
     }
   };
 
+  const createSubscriptionInDatabase = async () => {
+    if (!user || !selectedAddress) {
+      throw new Error('User or address not available');
+    }
+
+    // Prepare subscription items
+    const subscriptionItems: SubscriptionItem[] = items.map((item: CheckoutItem) => ({
+      productId: item.productId,
+      quantity: item.quantity,
+    }));
+
+    const subscriptionData = {
+      userId: user.id,
+      items: subscriptionItems,
+      frequency,
+      paymentMethod: paymentMethod,
+      paymentStatus: paymentMethod === PaymentMethod.COD ? PaymentStatus.PENDING : PaymentStatus.PAID,
+      status: SubscriptionStatus.PENDING,
+      deliveryAddress: selectedAddress,
+      startDate: dateToTimestamp(startDate),
+      endDate: dateToTimestamp(endDate),
+    };
+
+    console.log('=== Subscription Creation Debug ===');
+    console.log('Full Subscription Data:', JSON.stringify(subscriptionData, null, 2));
+    console.log('========================');
+
+    try {
+      const subscriptionId = await createSubscription(subscriptionData);
+
+      // Notify all admins
+      const admins = await getUsersByRole(UserRole.ADMIN);
+      const subscription = await getSubscriptionById(subscriptionId);
+      for (const admin of admins) {
+        await createNotification(
+          admin.id,
+          NotificationType.SUBSCRIPTION_CREATED,
+          'New Subscription Received',
+          `Subscription ${subscription?.subscriptionNumber} created`,
+          { subscriptionId, metadata: { subscriptionNumber: subscription?.subscriptionNumber } }
+        );
+      }
+
+      console.log('✅ Subscription created successfully:', subscriptionId);
+      return subscriptionId;
+    } catch (error: any) {
+      console.error('❌ Subscription creation failed:', error);
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
+      throw error;
+    }
+  };
+
   const handleCreateSubscription = async () => {
     if (!user) {
       Alert.alert('Error', 'Please login to create subscription');
@@ -168,16 +224,8 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
           const paymentResult = await handleRazorpayPayment();
           
           // Payment successful, create subscription
-          await createSubscription({
-            userId: user.id,
-            items: subscriptionItems,
-            frequency,
-            status: SubscriptionStatus.PENDING,
-            deliveryAddress: selectedAddress,
-            startDate: dateToTimestamp(startDate),
-            endDate: dateToTimestamp(endDate),
-          });
-
+          const subscriptionId = await createSubscriptionInDatabase();
+          
           Alert.alert(
             'Subscription Created! 🎉',
             `Payment Successful!\n\n📦 Deliveries: ${totalDeliveries}\n💰 Amount Paid: ${formatCurrency(totalAmount)}\n📅 First delivery: ${formatDate(dateToTimestamp(startDate))}\n\nPayment ID: ${paymentResult.paymentId.slice(0, 12)}...`,
@@ -204,19 +252,11 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
         }
       } else {
         // Cash on Delivery
-        await createSubscription({
-          userId: user.id,
-          items: subscriptionItems,
-          frequency,
-          status: SubscriptionStatus.ACTIVE,
-          deliveryAddress: selectedAddress,
-          startDate: dateToTimestamp(startDate),
-          endDate: dateToTimestamp(endDate),
-        });
+        const subscriptionId = await createSubscriptionInDatabase();
 
         Alert.alert(
           'Subscription Created! 🎉',
-          `Your subscription is now active!\n\n📦 Deliveries: ${totalDeliveries}\n💰 Total Amount: ${formatCurrency(totalAmount)}\n💵 Payment: Cash on Delivery\n📅 First delivery: ${formatDate(dateToTimestamp(startDate))}`,
+          `📦 Deliveries: ${totalDeliveries}\n💰 Total Amount: ${formatCurrency(totalAmount)}\n💵 Payment: Cash on Delivery\n📅 First delivery: ${formatDate(dateToTimestamp(startDate))}`,
           [
             {
               text: 'View Subscriptions',
@@ -305,7 +345,7 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
               styles.paymentOption,
               paymentMethod === 'cod' && styles.paymentOptionActive,
             ]}
-            onPress={() => setPaymentMethod('cod')}
+            onPress={() => setPaymentMethod(PaymentMethod.COD)}
           >
             <View style={styles.paymentOptionContent}>
               <View style={styles.radioButton}>
@@ -327,7 +367,7 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
               styles.paymentOption,
               paymentMethod === 'online' && styles.paymentOptionActive,
             ]}
-            onPress={() => setPaymentMethod('online')}
+            onPress={() => setPaymentMethod(PaymentMethod.ONLINE)}
           >
             <View style={styles.paymentOptionContent}>
               <View style={styles.radioButton}>

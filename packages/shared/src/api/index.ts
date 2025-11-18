@@ -5,5 +5,6 @@ export * from './cart';
 export * from './subscriptions';
 export * from './orders';
 export * from './settings';
+export * from './notifications';
 export * from './storage';
 export * from './delivery-partners';

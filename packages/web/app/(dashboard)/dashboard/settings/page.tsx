@@ -578,24 +578,6 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* Delivery Partners */}
-          <div className="card">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-900">
-                🚚 Delivery Partners ({getRoleUsers(UserRole.CUSTOMER).length})
-              </h2>
-              <button className="btn-secondary text-sm" disabled>
-                ➕ Add Delivery Partner (Coming Soon)
-              </button>
-            </div>
-            
-            <div className="text-center py-12 text-gray-500">
-              <p className="mb-4 text-4xl">🚧</p>
-              <p>Delivery partner management coming soon</p>
-              <p className="text-sm mt-2">You'll be able to add and manage delivery partners here</p>
-            </div>
-          </div>
-
           {/* Operators */}
           <div className="card">
             <div className="flex items-center justify-between mb-4">

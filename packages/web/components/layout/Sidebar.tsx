@@ -19,6 +19,7 @@ const navigation: NavItem[] = [
   { name: 'Inventory', href: '/dashboard/inventory', icon: '🏪' },
   { name: 'Reports', href: '/dashboard/reports', icon: '📈' },
   { name: 'Bulk Updates', href: '/dashboard/bulk-update', icon: '⚡' },
+  { name: 'Notifications', href: '/dashboard/notifications', icon: '🔔' },
   { name: 'Settings', href: '/dashboard/settings', icon: '⚙️' },
 ];
 

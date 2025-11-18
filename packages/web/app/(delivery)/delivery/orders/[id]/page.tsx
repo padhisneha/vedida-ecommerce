@@ -6,6 +6,7 @@ import Link from 'next/link';
 import {
   getOrderByIdWithProducts,
   updateOrderStatus,
+  getUsersByRole,
   Order,
   OrderStatus,
   formatCurrency,
@@ -13,6 +14,8 @@ import {
   formatDateTime,
   PLATFORM_FEE,
   DELIVERY_FEE,
+  NotificationType,
+  createNotification,
 } from '@ecommerce/shared';
 import { showToast } from '@/lib/toast';
 import { generateOrderInvoicePDF } from '@/lib/invoice-generator';
@@ -90,6 +93,59 @@ export default function DeliveryOrderDetailPage({ params }: { params: { id: stri
 
     try {
       await updateOrderStatus(order.id, newStatus);
+
+      alert(newStatus);
+
+      // Notify customer
+      if (newStatus === OrderStatus.CONFIRMED) {
+        await createNotification(
+          order.userId,
+          NotificationType.ORDER_CONFIRMED,
+          'Order Confirmed',
+          `Your order ${order.orderNumber} has been confirmed`,
+          { orderId: order.id, metadata: { orderNumber: order.orderNumber } }
+        );
+      }
+      
+      // Notify customer
+      if (newStatus === OrderStatus.OUT_FOR_DELIVERY) {
+        await createNotification(
+          order.userId,
+          NotificationType.ORDER_OUT_FOR_DELIVERY,
+          'Order Out for Delivery',
+          `Your order ${order.orderNumber} is out for delivery`,
+          { orderId: order.id, metadata: { orderNumber: order.orderNumber } }
+        );
+      }
+      
+      // Notify customer and admin
+      if (newStatus === OrderStatus.DELIVERED) {
+        
+        // Notify customer
+        await createNotification(
+          order.userId,
+          NotificationType.ORDER_DELIVERED,
+          'Order Delivered',
+          `Your order ${order.orderNumber} has been delivered`,
+          { orderId: order.id, metadata: { orderNumber: order.orderNumber } }
+        );
+
+        // Notify admin
+        const admins = await getUsersByRole(UserRole.ADMIN);
+        alert(admins.length);
+        for (const admin of admins) {
+          alert("hello");
+          alert(admin.id);
+          await createNotification(
+            admin.id,
+            NotificationType.ORDER_DELIVERED,
+            'Order Delivered',
+            `${order.orderNumber} delivered by ${order.deliveryPartnerName}`,
+            { orderId: order.id, metadata: { orderNumber: order.orderNumber } }
+          );
+        }
+      }
+
       showToast.dismiss(toastId);
       showToast.success('Order status updated successfully!');
       await loadCurrentUserAndOrder();
