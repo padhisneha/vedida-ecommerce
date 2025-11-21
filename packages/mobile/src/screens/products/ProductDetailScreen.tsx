@@ -83,6 +83,22 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
     }
   };
 
+  const getProductEmoji = (category: string) => {
+    if (!category) return '📦';
+    
+    const emojis: Record<string, string> = {
+        milk: '🥛',
+        ghee: '🧈',
+        paneer: '🧀',
+        curd: '🥣',
+        butter: '🧈',
+        cheese: '🧀',
+    };
+    
+    const key = category.toLowerCase();
+    return emojis[key] || '📦';
+  };
+
   if (loading) {
     return (
       <View style={styles.centerContainer}>
@@ -114,7 +130,7 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
             <Image source={{ uri: product.imageUrl }} style={styles.image} />
           ) : (
             <View style={styles.placeholderImage}>
-              <Text style={styles.placeholderEmoji}>📦</Text>
+              <Text style={styles.placeholderEmoji}>{getProductEmoji(product.category)}</Text>
             </View>
           )}
         </View>

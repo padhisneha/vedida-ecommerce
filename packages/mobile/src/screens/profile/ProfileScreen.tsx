@@ -77,6 +77,15 @@ export const ProfileScreen = ({ navigation }: any) => {
 
         <TouchableOpacity
           style={styles.menuItem}
+          onPress={() => navigation.navigate('Notifications')}
+        >
+          <Text style={styles.menuIcon}>🔔</Text>
+          <Text style={styles.menuText}>Notifications</Text>
+          <Text style={styles.menuArrow}>›</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.menuItem}
           onPress={() => navigation.navigate('HelpSupport')}
         >
           <Text style={styles.menuIcon}>❓</Text>

@@ -37,6 +37,9 @@ import { SelectAddressScreen } from '../screens/address/SelectAddressScreen';
 import { OrderHistoryScreen } from '../screens/orders/OrderHistoryScreen';
 import { OrderDetailScreen } from '../screens/orders/OrderDetailScreen';
 
+// Notifications Screen
+import { NotificationsScreen } from '../screens/notifications/NotificationsScreen';
+
 // Support Screen
 import { HelpSupportScreen } from '../screens/support/HelpSupportScreen';
 
@@ -250,6 +253,16 @@ const ProfileStack = () => {
         component={OrderDetailScreen}
         options={{
           title: 'Order Detail',  // <-- Add navigation header
+          headerStyle: { backgroundColor: '#fff' },
+          headerTintColor: '#4CAF50',
+          headerTitleStyle: { fontWeight: '600' },
+        }}
+      />
+      <Stack.Screen
+        name="Notifications"
+        component={NotificationsScreen}
+        options={{
+          title: 'Notifications',  // <-- Add navigation header
           headerStyle: { backgroundColor: '#fff' },
           headerTintColor: '#4CAF50',
           headerTitleStyle: { fontWeight: '600' },

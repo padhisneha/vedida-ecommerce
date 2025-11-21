@@ -9,18 +9,39 @@ import {
   ActivityIndicator,
   TextInput,
 } from 'react-native';
-import { Product, getInStockProducts, formatCurrency, ProductCategory } from '@ecommerce/shared';
+import { Product, getInStockProducts, formatCurrency, ProductCategory, useAuthStore, getUnreadCount } from '@ecommerce/shared';
 
 export const HomeScreen = ({ navigation }: any) => {
+  const { user } = useAuthStore(); // ADD THIS
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<ProductCategory | 'all'>('all');
+  const [unreadCount, setUnreadCount] = useState(0); // ADD THIS
 
   useEffect(() => {
     loadProducts();
-  }, []);
+    if (user) {
+      loadUnreadCount();
+      
+      // Refresh unread count every 30 seconds
+      const interval = setInterval(loadUnreadCount, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [user]);
+
+  // ADD THIS FUNCTION
+  const loadUnreadCount = async () => {
+    if (!user) return;
+    
+    try {
+      const count = await getUnreadCount(user.id);
+      setUnreadCount(count);
+    } catch (error) {
+      console.error('Error loading unread count:', error);
+    }
+  };
 
   useEffect(() => {
     filterProducts();
@@ -69,6 +90,22 @@ export const HomeScreen = ({ navigation }: any) => {
     { value: ProductCategory.BUTTER, label: 'Butter', icon: '🧈' },
   ];
 
+  const getProductEmoji = (category: string) => {
+    if (!category) return '📦';
+    
+    const emojis: Record<string, string> = {
+        milk: '🥛',
+        ghee: '🧈',
+        paneer: '🧀',
+        curd: '🥣',
+        butter: '🧈',
+        cheese: '🧀',
+    };
+    
+    const key = category.toLowerCase();
+    return emojis[key] || '📦';
+  };
+
   const renderProduct = ({ item }: { item: Product }) => (
     <TouchableOpacity
       style={styles.productCard}
@@ -79,7 +116,7 @@ export const HomeScreen = ({ navigation }: any) => {
           <Image source={{ uri: item.imageUrl }} style={styles.image} />
         ) : (
           <View style={styles.placeholderImage}>
-            <Text style={styles.placeholderText}>📦</Text>
+            <Text style={styles.placeholderText}>{getProductEmoji(item.category)}</Text>
           </View>
         )}
       </View>
@@ -109,8 +146,33 @@ export const HomeScreen = ({ navigation }: any) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Vedida Farm Products</Text>
-        <Text style={styles.headerSubtitle}>Fresh to your doorstep</Text>
+        {/* Header Top Row - Title and Bell */}
+        <View style={styles.headerTop}>
+          <View style={styles.headerLeft}>
+            <Text style={styles.headerTitle}>Vedida Farms</Text>
+            <Text style={styles.headerSubtitle}>Fresh to your doorstep</Text>
+          </View>
+
+          {/* Notification Bell */}
+          {user && (
+            <TouchableOpacity 
+              style={styles.notificationButton}
+              onPress={() => {
+                navigation.navigate('ProfileTab', {screen:'Notifications'});
+                loadUnreadCount();
+              }}
+            >
+              <Text style={styles.bellIcon}>🔔</Text>
+              {unreadCount > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationBadgeText}>
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
 
         {/* Search Bar */}
         <View style={styles.searchContainer}>
@@ -218,10 +280,20 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#fff',
-    padding: 20,
+    paddingHorizontal: 20,
     paddingTop: 60,
+    paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  headerLeft: {
+    flex: 1,
   },
   headerTitle: {
     fontSize: 24,
@@ -232,7 +304,33 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 16,
+  },
+  notificationButton: {
+    position: 'relative',
+    padding: 8,
+    marginTop: -8,
+  },
+  bellIcon: {
+    fontSize: 28,
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  notificationBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: 'bold',
   },
   searchContainer: {
     flexDirection: 'row',
