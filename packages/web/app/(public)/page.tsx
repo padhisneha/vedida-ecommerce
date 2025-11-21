@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { initializeApp } from '@/lib/firebase';
+import { getActiveOffers, getAllProducts, Offer, Product } from '@ecommerce/shared';
 import { ShoppingBag, Smartphone, Mail } from 'lucide-react';
 import { Facebook, Instagram, Twitter, Linkedin, Youtube, X } from 'lucide-react';
 import Link from 'next/link';
@@ -8,7 +10,7 @@ import Image from 'next/image';
 
 type ModalType = 'about' | 'privacy' | 'refund' | null;
 
-// Mock data - will be replaced with API calls
+// Keep mock data as fallback
 const mockOffers = [
   {
     id: '1',
@@ -35,7 +37,8 @@ const mockOffers = [
   },
 ];
 
-const products = [
+// Keep mock data as fallback
+const mockProducts = [
   {
     id: '1',
     name: 'Fresh Cow Milk',
@@ -184,25 +187,78 @@ const testimonials = [
 ];
 
 const serviceAreas = [
-  { city: 'Bangalore', areas: ['Whitefield', 'Koramangala', 'HSR Layout', 'Indiranagar'] },
   { city: 'Hyderabad', areas: ['Gachibowli', 'Madhapur', 'Banjara Hills', 'Jubilee Hills'] },
+  { city: 'Bangalore', areas: ['Whitefield', 'Koramangala', 'HSR Layout', 'Indiranagar'] },
   { city: 'Chennai', areas: ['Anna Nagar', 'T Nagar', 'Velachery', 'Adyar'] },
 ];
 
 export default function HomePage() {
+
+  const [offers, setOffers] = useState<Offer[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loadingOffers, setLoadingOffers] = useState(true);
+  const [loadingProducts, setLoadingProducts] = useState(true);
+
   const [currentOfferIndex, setCurrentOfferIndex] = useState(0);
   const [currentTestimonialIndex, setCurrentTestimonialIndex] = useState(0);
   const [currentProductIndex, setCurrentProductIndex] = useState(0); 
 
   const [openModal, setOpenModal] = useState<ModalType>(null);
 
-  // Auto-rotate offers every 5 seconds
+  // Initialize Firebase
   useEffect(() => {
+    try {
+      initializeApp();
+      console.log('✅ Firebase initialized for public page');
+    } catch (error) {
+      console.error('Firebase initialization error:', error);
+    }
+  }, []);
+
+  // Load offers from database
+  useEffect(() => {
+    const loadOffers = async () => {
+      try {
+        const data = await getActiveOffers();
+        setOffers(data.length > 0 ? data : mockOffers); // Fallback to mock if no offers
+        console.log('✅ Loaded offers:', data.length);
+      } catch (error) {
+        console.error('Error loading offers:', error);
+        setOffers(mockOffers); // Fallback to mock on error
+      } finally {
+        setLoadingOffers(false);
+      }
+    };
+
+    loadOffers();
+  }, []);
+
+  // Load products from database
+  useEffect(() => {
+    const loadProducts = async () => {
+      try {
+        const data = await getAllProducts();
+        setProducts(data.length > 0 ? data : mockProducts); // Fallback to mock
+        console.log('✅ Loaded products:', data.length);
+      } catch (error) {
+        console.error('Error loading products:', error);
+        setProducts(mockProducts); // Fallback to mock on error
+      } finally {
+        setLoadingProducts(false);
+      }
+    };
+
+    loadProducts();
+  }, []);
+
+  // Auto-rotate offers
+  useEffect(() => {
+    if (offers.length === 0) return;
     const timer = setInterval(() => {
-      setCurrentOfferIndex((prev) => (prev + 1) % mockOffers.length);
+      setCurrentOfferIndex((prev) => (prev + 1) % offers.length);
     }, 5000);
     return () => clearInterval(timer);
-  }, []);
+  }, [offers.length]);
 
   // Auto-rotate testimonials every 6 seconds
   useEffect(() => {
@@ -212,7 +268,36 @@ export default function HomePage() {
     return () => clearInterval(timer);
   }, []);
 
-  const currentOffer = mockOffers[currentOfferIndex];
+  const getProductEmoji = (category: string) => {
+    if (!category) return '📦';
+    
+    const emojis: Record<string, string> = {
+        milk: '🥛',
+        ghee: '🧈',
+        paneer: '🧀',
+        curd: '🥣',
+        butter: '🧈',
+        cheese: '🧀',
+    };
+    
+    const key = category.toLowerCase();
+    return emojis[key] || '📦';
+  };
+
+    // Helper to format product for display
+  const formatProductForDisplay = (product: any) => {
+    return {
+        id: product.id,
+        name: product.name || 'Product',
+        description: product.description || `Fresh ${product.name || 'dairy product'}`,
+        price: product.price || 0,
+        unit: product.unit ? `${product.quantity || ''} ${product.unit}`.trim() : 'unit',
+        emoji: getProductEmoji(product.category),
+        imageUrl: product.imageUrl,
+    };
+  };
+
+  const currentOffer = offers[currentOfferIndex] || null;
   const currentTestimonial = testimonials[currentTestimonialIndex];
 
   return (
@@ -313,170 +398,163 @@ export default function HomePage() {
             <p className="text-xl text-gray-600">Delivered fresh from our farms to your home</p>
             </div>
 
-            {/* Carousel Container */}
+            {loadingProducts ? (
+            <div className="text-center py-12">
+                <div className="text-5xl mb-4 animate-pulse">🥛</div>
+                <p className="text-gray-600">Loading products...</p>
+            </div>
+            ) : products.length === 0 ? (
+            <div className="text-center py-12">
+                <div className="text-5xl mb-4">📦</div>
+                <p className="text-gray-600">Check our app for available products</p>
+                <a href="#download" className="btn-primary mt-4 inline-block">
+                Download App
+                </a>
+            </div>
+            ) : (
             <div className="relative">
-            {/* Overflow container */}
-            <div className="overflow-hidden">
-                {/* Products Track - Smooth sliding */}
+                <div className="overflow-hidden">
                 <div 
-                className="flex gap-6 transition-transform duration-500 ease-in-out"
-                style={{ 
+                    className="flex gap-6 transition-transform duration-500 ease-in-out"
+                    style={{ 
                     transform: `translateX(-${currentProductIndex * (100 / 4)}%)`,
-                }}
+                    }}
                 >
-                {products.map((product, index) => (
-                    <div
-                    key={product.id}
-                    className="flex-shrink-0 w-full sm:w-[calc(50%-12px)] lg:w-[calc(25%-18px)]"
-                    >
-                    <div className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 h-full">
-                        <div className="h-48 bg-gradient-to-br from-green-100 to-green-50 flex items-center justify-center text-8xl relative overflow-hidden group">
-                        <div className="absolute inset-0 bg-green-600 opacity-0 group-hover:opacity-10 transition-opacity duration-300"></div>
-                        <span className="transform group-hover:scale-110 transition-transform duration-300">
-                            {product.emoji}
-                        </span>
-                        </div>
-                        <div className="p-6">
-                        <h3 className="text-xl font-bold text-gray-900 mb-2">{product.name}</h3>
-                        <p className="text-gray-600 text-sm mb-4 h-10">{product.description}</p>
-                        <div className="flex items-center justify-between mb-4">
-                            <div>
-                            <span className="text-2xl font-bold text-green-600">₹{product.price}</span>
-                            <span className="text-gray-500 text-sm">/{product.unit}</span>
+                    {products.map((product) => {
+                    const displayProduct = {
+                        id: product.id,
+                        name: product.name || 'Product',
+                        description: product.description || `Fresh ${product.name || 'dairy product'}`,
+                        price: product.price || 0,
+                        unit: `${product.quantity || ''} ${product.unit || ''}`.trim() || 'unit',
+                        emoji: getProductEmoji(product.category),
+                        imageUrl: product.imageUrl,
+                    };
+                    
+                    return (
+                        <div
+                        key={product.id}
+                        className="flex-shrink-0 w-full sm:w-[calc(50%-12px)] lg:w-[calc(25%-18px)]"
+                        >
+                        <div className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 h-full">
+                            <div className="h-48 bg-gradient-to-br from-green-100 to-green-50 flex items-center justify-center relative overflow-hidden group">
+                            <div className="absolute inset-0 bg-green-600 opacity-0 group-hover:opacity-10 transition-opacity duration-300"></div>
+                            
+                            {displayProduct.imageUrl ? (
+                                <img
+                                src={displayProduct.imageUrl}
+                                alt={displayProduct.name}
+                                className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-300"
+                                />
+                            ) : (
+                                <span className="text-8xl transform group-hover:scale-110 transition-transform duration-300">
+                                {displayProduct.emoji}
+                                </span>
+                            )}
+                            </div>
+                            <div className="p-6">
+                            <h3 className="text-xl font-bold text-gray-900 mb-2">{displayProduct.name}</h3>
+                            <p className="text-gray-600 text-sm mb-4 h-10">{displayProduct.description}</p>
+                            <div className="flex items-center justify-between mb-4">
+                                <div>
+                                <span className="text-2xl font-bold text-green-600">₹{displayProduct.price}</span>
+                                <span className="text-gray-500 text-sm">/{displayProduct.unit}</span>
+                                </div>
+                            </div>
+                            <a 
+                                href="#download" 
+                                className="btn-primary w-full text-center block group"
+                            >
+                                <span className="inline-block group-hover:scale-110 transition-transform">
+                                Order via App
+                                </span>
+                            </a>
                             </div>
                         </div>
-                        <a 
-                            href="#download" 
-                            className="btn-primary w-full text-center block group"
-                        >
-                            <span className="inline-block group-hover:scale-110 transition-transform">
-                            Order via App
-                            </span>
-                        </a>
                         </div>
-                    </div>
-                    </div>
-                ))}
+                    );
+                    })}
                 </div>
-            </div>
+                </div>
 
-            {/* Navigation Arrows */}
-            {products.length > 4 && (
+                {/* Navigation Arrows - Only show if more than 4 products */}
+                {products.length > 4 && (
                 <>
-                {/* Previous Button */}
-                <button
+                    <button
                     onClick={() => setCurrentProductIndex((prev) => Math.max(0, prev - 1))}
                     disabled={currentProductIndex === 0}
                     className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 lg:-translate-x-6 w-12 h-12 bg-white rounded-full shadow-xl flex items-center justify-center text-gray-700 hover:bg-green-600 hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:text-gray-400 z-10 border-2 border-gray-100"
-                >
+                    >
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
                     </svg>
-                </button>
+                    </button>
 
-                {/* Next Button */}
-                <button
+                    <button
                     onClick={() => setCurrentProductIndex((prev) => Math.min(products.length - 4, prev + 1))}
                     disabled={currentProductIndex >= products.length - 4}
                     className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 lg:translate-x-6 w-12 h-12 bg-white rounded-full shadow-xl flex items-center justify-center text-gray-700 hover:bg-green-600 hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:text-gray-400 z-10 border-2 border-gray-100"
-                >
+                    >
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
                     </svg>
-                </button>
+                    </button>
+
+                    <div className="flex justify-center gap-2 mt-8">
+                    {Array.from({ length: Math.max(0, products.length - 3) }, (_, i) => i).map((index) => (
+                        <button
+                        key={index}
+                        onClick={() => setCurrentProductIndex(index)}
+                        className={`h-2 rounded-full transition-all ${
+                            index === currentProductIndex 
+                            ? 'bg-green-600 w-8' 
+                            : 'bg-gray-300 w-2 hover:bg-gray-400'
+                        }`}
+                        />
+                    ))}
+                    </div>
                 </>
-            )}
-
-            {/* Dot Indicators */}
-            {products.length > 4 && (
-                <div className="flex justify-center gap-2 mt-8">
-                {Array.from({ length: products.length - 3 }, (_, i) => i).map((index) => (
-                    <button
-                    key={index}
-                    onClick={() => setCurrentProductIndex(index)}
-                    className={`h-2 rounded-full transition-all ${
-                        index === currentProductIndex 
-                        ? 'bg-green-600 w-8' 
-                        : 'bg-gray-300 w-2 hover:bg-gray-400'
-                    }`}
-                    />
-                ))}
-                </div>
-            )}
+                )}
             </div>
-
-            {/* View All Products Link */}
-            {/* <div className="text-center mt-10">
-            <a href="#download" className="text-green-600 hover:text-green-700 font-semibold text-lg inline-flex items-center gap-2 group">
-                <span>View All Products in App</span>
-                <span className="transform group-hover:translate-x-1 transition-transform">→</span>
-            </a>
-            </div> */}
+            )}
         </div>
       </section>
-      
-
-      {/* Products Showcase */}
-      {/* <section id="products" className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Our Fresh Products</h2>
-            <p className="text-xl text-gray-600">Delivered fresh from our farms to your home</p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {products.map((product) => (
-              <div
-                key={product.id}
-                className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow"
-              >
-                <div className="h-48 bg-gradient-to-br from-green-100 to-green-50 flex items-center justify-center text-8xl">
-                  {product.emoji}
-                </div>
-                <div className="p-6">
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">{product.name}</h3>
-                  <p className="text-gray-600 text-sm mb-4">{product.description}</p>
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <span className="text-2xl font-bold text-green-600">₹{product.price}</span>
-                      <span className="text-gray-500 text-sm">/{product.unit}</span>
-                    </div>
-                  </div>
-                  <a href="#download" className="btn-primary w-full text-center">
-                    Order via App
-                  </a>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section> */}
 
       
       {/* Dynamic Offers Carousel - Compact Top Banner */}
       <section className="bg-gradient-to-r from-green-600 via-green-500 to-green-600 sticky top-16 z-40 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="py-3 flex items-center justify-between">
-        <div className="flex-1 flex items-center justify-center gap-4">
-            {/* <span className="text-3xl ">⚡</span> */}
-            <div className="text-white">
-            <span className="font-bold text-lg">{currentOffer.title}</span>
-            <span className="mx-2">•</span>
-            <span>{currentOffer.description}</span>
-            {currentOffer.couponCode && (
-                <>
-                <span className="mx-2">•</span>
-                <span className="font-mono bg-white text-green-700 px-3 py-1 rounded font-bold">
-                    {currentOffer.couponCode}
-                </span>
-                </>
-            )}
+        {loadingOffers ? (
+            <div className="text-center text-white py-4">
+                <div className="text-2xl mb-2">Loading offers...</div>
             </div>
-        </div>
+            ) : offers.length === 0 ? (
+            <div className="text-center text-white py-4">
+                <div className="text-2xl mb-2">✨ Check back soon for exciting offers!</div>
+            </div>
+        ) : currentOffer ? (
+            <div className="flex-1 flex items-center justify-center gap-4">
+                {/* <span className="text-3xl ">⚡</span> */}
+                <div className="text-white">
+                <span className="font-bold text-lg">{currentOffer.title}</span>
+                <span className="mx-2">•</span>
+                <span>{currentOffer.description}</span>
+                {currentOffer.couponCode && (
+                    <>
+                    <span className="mx-2">•</span>
+                    <span className="font-mono bg-white text-green-700 px-3 py-1 rounded font-bold">
+                        {currentOffer.couponCode}
+                    </span>
+                    </>
+                )}
+                </div>
+            </div>
+        ) : null}
         
         {/* Navigation dots */}
         <div className="hidden md:flex gap-2">
-            {mockOffers.map((_, index) => (
+            {offers.map((_, index) => (
             <button
                 key={index}
                 onClick={() => setCurrentOfferIndex(index)}
@@ -553,8 +631,8 @@ export default function HomePage() {
             {/* <p className="text-gray-600">Limited time deals just for you</p> */}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {mockOffers.map((offer, index) => (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {offers.map((offer, index) => (
                 <div
                 key={offer.id}
                 className={`rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 cursor-pointer ${
@@ -590,7 +668,19 @@ export default function HomePage() {
                 )}
                 {offer.endDate && (
                     <p className="text-sm mt-3 opacity-75" style={{ color: offer.textColor }}>
-                    Valid till {offer.endDate}
+                    Valid till {(() => {
+                        try {
+                            // Handle Firestore Timestamp
+                            const date = offer.endDate.toDate ? offer.endDate.toDate() : new Date(offer.endDate);
+                            return date.toLocaleDateString('en-IN', { 
+                            year: 'numeric', 
+                            month: 'short', 
+                            day: 'numeric' 
+                            });
+                        } catch (e) {
+                            return offer.endDate; // Fallback if it's already a string
+                        }
+                    })()}
                     </p>
                 )}
                 </div>
@@ -903,7 +993,7 @@ export default function HomePage() {
           {/* Social Media Icons */}
           <div className="border-t border-gray-800 pt-8 flex flex-col sm:flex-row justify-between items-center gap-4">
             <p className="text-sm text-gray-400">
-                © 2024 Vedida Farms. All rights reserved.
+                © 2025 Vedida Farms. All rights reserved.
             </p>
             <div className="flex gap-4">
                 <a 
