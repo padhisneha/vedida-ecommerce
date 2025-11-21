@@ -8,3 +8,4 @@ export * from './settings';
 export * from './notifications';
 export * from './storage';
 export * from './delivery-partners';
+export * from './offers';

@@ -93,6 +93,20 @@ export default function InventoryPage() {
     setCurrentPage(1);
   }, [searchQuery, categoryFilter, stockFilter]);
 
+  const getProductEmoji = (category: string) => {
+    const emojis: Record<string, string> = {
+        milk: '🥛',
+        ghee: '🧈',
+        paneer: '🧀',
+        curd: '🥣',
+        butter: '🧈',
+        cheese: '🧀',
+    };
+    
+    const key = category.toLowerCase();
+    return emojis[key] || '📦';
+  };
+
   const paginatedProducts = getPaginatedProducts();
   const totalPages = getTotalPages();
   const filteredCount = getFilteredProducts().length;
@@ -275,7 +289,7 @@ export default function InventoryPage() {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="text-6xl">📦</div>
+                    <div className="text-6xl"> {getProductEmoji(product.category)}</div>
                   )}
                   {!product.inStock && (
                     <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full font-semibold">

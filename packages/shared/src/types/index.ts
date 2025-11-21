@@ -229,3 +229,4 @@ export const COLLECTIONS = {
 
 export * from './settings';
 export * from './notifications';
+export * from './offers';

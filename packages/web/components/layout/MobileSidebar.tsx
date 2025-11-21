@@ -21,6 +21,7 @@ const navigation: NavItem[] = [
   { name: 'Reports', href: '/dashboard/reports', icon: '📈' },
   { name: 'Bulk Updates', href: '/dashboard/bulk-update', icon: '⚡' },
   { name: 'Notifications', href: '/dashboard/notifications', icon: '🔔' },
+  { name: 'Offers', href: '/dashboard/offers', icon: '✨' },
   { name: 'Settings', href: '/dashboard/settings', icon: '⚙️' },
 ];
 

@@ -5,6 +5,8 @@ import { useAuth } from '@/contexts/AuthContext';
 export default function DashboardPage() {
   const { user } = useAuth();
 
+  return;
+
   return (
     <div className="p-8">
       <div className="mb-8">
