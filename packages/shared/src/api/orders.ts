@@ -12,7 +12,7 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { getFirebaseFirestore } from './firebase-config';
-import { Order, OrderStatus, OrderType, COLLECTIONS } from '../types';
+import { Order, OrderStatus, OrderType, COLLECTIONS, PaymentStatus } from '../types';
 import { getCurrentTimestamp } from '../utils';
 import { getProductById } from './products';
 
@@ -448,6 +448,50 @@ export const generateSubscriptionOrders = async (
   }
   
   return { created, skipped, errors };
+};
+
+/**
+ * Verify UPI payment and update order status
+ */
+export const verifyUPIPayment = async (
+  orderId: string,
+  paymentVerified: boolean,
+  adminNotes?: string
+): Promise<void> => {
+  const db = getFirebaseFirestore();
+  
+  const updateData: any = {
+    paymentStatus: paymentVerified ? PaymentStatus.PAID : PaymentStatus.FAILED,
+    updatedAt: getCurrentTimestamp(),
+  };
+  
+  if (paymentVerified) {
+    // Also confirm the order
+    updateData.status = OrderStatus.CONFIRMED;
+  } else {
+    // Mark as cancelled if payment failed
+    updateData.status = OrderStatus.CANCELLED;
+  }
+  
+  if (adminNotes) {
+    updateData.deliveryNotes = adminNotes;
+  }
+  
+  await updateDoc(doc(db, COLLECTIONS.ORDERS, orderId), updateData);
+  
+  // Send notification to customer
+  // const order = await getOrderById(orderId);
+  // if (order) {
+  //   await createNotification(
+  //     order.userId,
+  //     paymentVerified ? NotificationType.ORDER_CONFIRMED : NotificationType.ORDER_CANCELLED,
+  //     paymentVerified ? 'Payment Verified ✅' : 'Payment Verification Failed ❌',
+  //     paymentVerified 
+  //       ? `Your UPI payment has been verified. Order ${order.orderNumber} is confirmed!`
+  //       : `We couldn't verify your payment for order ${order.orderNumber}. Please contact support.`,
+  //     { orderId, metadata: { orderNumber: order.orderNumber } }
+  //   );
+  // }
 };
 
 /**

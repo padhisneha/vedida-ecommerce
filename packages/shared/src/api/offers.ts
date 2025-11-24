@@ -12,7 +12,7 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { getFirebaseFirestore } from './firebase-config';
-import { Offer, CartItem } from '../types';
+import { Offer, CartItem, SubscriptionItem, OfferApplicability } from '../types';
 
 const COLLECTIONS = {
   OFFERS: 'offers',
@@ -134,11 +134,12 @@ export const toggleOfferStatus = async (offerId: string, isActive: boolean): Pro
 };
 
 /**
- * Get applicable coupons for cart
+ * Get applicable coupons for cart/subscription
  */
 export const getApplicableCoupons = async (
-  cartItems: CartItem[],
-  subtotal: number
+  cartItems: CartItem[] | SubscriptionItem[],
+  subtotal: number,
+  type: 'order' | 'subscription' = 'order'
 ): Promise<Offer[]> => {
   const db = getFirebaseFirestore();
   const now = Timestamp.now();
@@ -158,8 +159,16 @@ export const getApplicableCoupons = async (
     ...doc.data(),
   })) as Offer[];
 
-  // Filter by date range and applicability
+  // Filter by date range, applicability, and type
   return offers.filter(offer => {
+    // Check applicability (orders vs subscriptions)
+    if (type === 'order' && offer.applicability === OfferApplicability.SUBSCRIPTIONS_ONLY) {
+      return false;
+    }
+    if (type === 'subscription' && offer.applicability === OfferApplicability.ORDERS_ONLY) {
+      return false;
+    }
+    
     // Check date validity
     const start = offer.startDate.toDate();
     const end = offer.endDate.toDate();
@@ -171,9 +180,10 @@ export const getApplicableCoupons = async (
     
     // Check if cart has applicable products
     if (offer.applicableCategories && offer.applicableCategories.length > 0) {
-      const hasApplicable = cartItems.some(item =>
-        item.product && offer.applicableCategories!.includes(item.product.category)
-      );
+      const hasApplicable = cartItems.some((item: any) => {
+        const product = item.product || item; // Handle both CartItem and SubscriptionItem
+        return product && offer.applicableCategories!.includes(product.category);
+      });
       if (!hasApplicable) return false;
     }
     

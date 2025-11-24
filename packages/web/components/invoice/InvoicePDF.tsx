@@ -335,7 +335,7 @@ export const InvoicePDF: React.FC<InvoicePDFProps> = ({ order, subscription, tax
               <Text style={styles.detailLabel}>Payment: </Text>
               {paymentMethod === 'cod' ? 'Cash on Delivery' : 
                paymentMethod === 'online' ? 'Online Payment' : 
-               'Card Payment'}
+               'UPI Payment'}
             </Text>
           </View>
         </View>

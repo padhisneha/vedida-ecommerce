@@ -21,6 +21,15 @@ export const RAZORPAY_CONFIG = {
 };
 
 /**
+ * UPI Payment configuration
+ */
+export const UPI_CONFIG = {
+  upiId: 'vedidafarms@paytm',  // Replace with actual UPI ID
+  merchantName: 'Vedida Farms',
+  merchantCode: 'VEDIDA',
+};
+
+/**
  * Support contact details
  */
 export const SUPPORT_CONTACT = {

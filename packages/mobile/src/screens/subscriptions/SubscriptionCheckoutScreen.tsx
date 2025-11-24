@@ -1,3 +1,4 @@
+// SubscriptionCheckoutScreen.tsx
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -7,9 +8,11 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Modal,
+  Linking,
 } from 'react-native';
+import QRCode from 'react-native-qrcode-svg';
 import RazorpayCheckout from 'react-native-razorpay';
-import { PaymentMethod, PaymentStatus, RAZORPAY_CONFIG } from '@ecommerce/shared';
 import {
   useAuthStore,
   formatCurrency,
@@ -25,13 +28,29 @@ import {
   NotificationType,
   getUsersByRole,
   getSubscriptionById,
+  getApplicableCoupons,
+  Offer,
+  ProductCategory,
+  calculateOfferDiscount,
+  generateUPIString, 
+  generateTransactionRef,
+  PaymentMethod,
+  PaymentStatus,
+  RAZORPAY_CONFIG,
+  UPI_CONFIG,
+  TaxBreakdown,
+  calculateOrderTotal,
 } from '@ecommerce/shared';
+import { showToast } from '../../utils/toast';
 
 interface CheckoutItem {
   productId: string;
   productName: string;
   quantity: number;
   price: number;
+  priceExcludingTax: number;
+  taxCGST: number;
+  taxSGST: number;
 }
 
 export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
@@ -42,13 +61,42 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
     endDate,
     totalDeliveries,
     perDeliveryTotal,
-    totalAmount,
+    taxBreakdown: initialTaxBreakdown,
+    platformFee,
+    deliveryFee: baseDeliveryFee,
+    totalAmount: initialTotalAmount,
   } = route.params;
 
   const { user } = useAuthStore();
   const [selectedAddress, setSelectedAddress] = useState<UserAddress | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.COD);
   const [loading, setLoading] = useState(false);
+
+  // UPI QR state
+  const [showUPIModal, setShowUPIModal] = useState(false);
+  const [upiString, setUpiString] = useState('');
+  const [transactionRef, setTransactionRef] = useState('');
+  const [upiPaymentAcknowledged, setUpiPaymentAcknowledged] = useState(false);
+
+  // Coupon state
+  const [availableCoupons, setAvailableCoupons] = useState<Offer[]>([]);
+  const [loadingCoupons, setLoadingCoupons] = useState(true);
+  const [appliedCoupons, setAppliedCoupons] = useState<Offer[]>([]);
+  const [showCouponModal, setShowCouponModal] = useState(false);
+
+  // Recalculated prices with coupons
+  const [finalPrices, setFinalPrices] = useState({
+    subtotal: initialTaxBreakdown.subtotal,
+    discount: 0,
+    subtotalAfterDiscount: initialTaxBreakdown.subtotal,
+    cgst: initialTaxBreakdown.cgst,
+    sgst: initialTaxBreakdown.sgst,
+    totalTax: initialTaxBreakdown.totalTax,
+    platformFee,
+    deliveryFee: baseDeliveryFee,
+    total: initialTotalAmount,
+    freeDeliveryApplied: false,
+  });
 
   useEffect(() => {
     // Auto-select default address or first address
@@ -57,6 +105,178 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
       setSelectedAddress(defaultAddr || user.addresses[0]);
     }
   }, [user]);
+
+  useEffect(() => {
+    if (user && items.length > 0) {
+      loadApplicableCoupons();
+    }
+  }, [user, items]);
+
+  const loadApplicableCoupons = async () => {
+    if (!user) return;
+    
+    setLoadingCoupons(true);
+    try {
+      // Convert items to have product info for validation
+      const itemsWithProducts = items.map((item: CheckoutItem) => ({
+        productId: item.productId,
+        quantity: item.quantity,
+        product: {
+          name: item.productName,
+          price: item.price,
+          priceExcludingTax: item.priceExcludingTax,
+          taxCGST: item.taxCGST,
+          taxSGST: item.taxSGST,
+          //category: 'milk', // You may need to pass this from previous screen
+        },
+      }));
+      
+      // For subscriptions, check against total amount (all deliveries)
+      const coupons = await getApplicableCoupons(
+        items, //itemsWithProducts
+        initialTaxBreakdown.subtotal,
+        'subscription'
+      );
+      setAvailableCoupons(coupons);
+      console.log('✅ Loaded applicable coupons for subscription:', coupons.length);
+      
+      // Auto-apply free delivery if eligible
+      const freeDeliveryCoupon = coupons.find(c => 
+        c.couponCode === 'FREEDELIVERY' && 
+        (!c.minOrderAmount || initialTaxBreakdown.subtotal >= c.minOrderAmount)
+      );
+      
+      if (freeDeliveryCoupon && baseDeliveryFee > 0) {
+        setAppliedCoupons([freeDeliveryCoupon]);
+        showToast.success('Free delivery applied automatically!');
+      }
+    } catch (error) {
+      console.error('Error loading coupons:', error);
+      showToast.error('Failed to load coupons');
+    } finally {
+      setLoadingCoupons(false);
+    }
+  };
+
+  const recalculatePrices = () => {
+    const subtotal = initialTaxBreakdown.subtotal;
+    let totalDiscount = 0;
+    let freeDeliveryApplied = false;
+
+    // Calculate discount from all applied coupons
+    appliedCoupons.forEach((coupon) => {
+      // Convert items to cart-like format for validation
+      const cartItems = items.map((item: CheckoutItem) => ({
+        productId: item.productId,
+        quantity: item.quantity,
+        product: {
+          name: item.productName,
+          price: item.price,
+          priceExcludingTax: item.priceExcludingTax,
+          taxCGST: item.taxCGST,
+          taxSGST: item.taxSGST,
+        },
+      }));
+
+      const result = calculateOfferDiscount(cartItems, coupon, subtotal);
+
+      if (result.isValid) {
+        totalDiscount += result.discountAmount;
+
+        if (result.freeDeliveryApplied || coupon.includesFreeDelivery) {
+          freeDeliveryApplied = true;
+        }
+      }
+    });
+
+    // Calculate subtotal after discount
+    const subtotalAfterDiscount = Math.max(0, subtotal - totalDiscount);
+
+    // Recalculate tax on discounted amount
+    const taxRate = subtotal > 0 ? (initialTaxBreakdown.totalTax / subtotal) * 100 : 0;
+    const newTotalTax = (subtotalAfterDiscount * taxRate) / 100;
+    const newCgst = newTotalTax / 2;
+    const newSgst = newTotalTax / 2;
+
+    // Apply delivery fee (though it's 0 for subscriptions)
+    const deliveryFee = freeDeliveryApplied ? 0 : baseDeliveryFee;
+
+    // Calculate final total
+    const total = subtotalAfterDiscount + newTotalTax + platformFee + deliveryFee;
+
+    setFinalPrices({
+      subtotal,
+      discount: totalDiscount,
+      subtotalAfterDiscount,
+      cgst: newCgst,
+      sgst: newSgst,
+      totalTax: newTotalTax,
+      platformFee,
+      deliveryFee,
+      total,
+      freeDeliveryApplied,
+    });
+  };
+
+  const handleApplyCoupon = (coupon: Offer) => {
+    // Check if coupon is already applied
+    if (appliedCoupons.some((c) => c.id === coupon.id)) {
+      showToast.error('This coupon is already applied');
+      return;
+    }
+
+    // Validate coupon
+    const cartItems = items.map((item: CheckoutItem) => ({
+      productId: item.productId,
+      quantity: item.quantity,
+      product: {
+        name: item.productName,
+        price: item.price,
+        priceExcludingTax: item.priceExcludingTax,
+        taxCGST: item.taxCGST,
+        taxSGST: item.taxSGST,
+      },
+    }));
+
+    const validation = calculateOfferDiscount(cartItems, coupon, initialTaxBreakdown.subtotal);
+
+    if (!validation.isValid) {
+      showToast.error(validation.reason || 'This coupon is not applicable');
+      return;
+    }
+
+    // Check clubbing rules
+    const hasNonFreeDeliveryCoupon = appliedCoupons.some((c) => c.couponCode !== 'FREEDELIVERY');
+    const isFreeDeliveryCoupon = coupon.couponCode === 'FREEDELIVERY';
+
+    if (hasNonFreeDeliveryCoupon && !isFreeDeliveryCoupon) {
+      showToast.error('You can only apply one discount coupon. FREEDELIVERY can be combined.');
+      return;
+    }
+
+    if (!isFreeDeliveryCoupon && hasNonFreeDeliveryCoupon) {
+      showToast.error('Remove the existing coupon first to apply this one');
+      return;
+    }
+
+    // Apply coupon
+    setAppliedCoupons([...appliedCoupons, coupon]);
+    setShowCouponModal(false);
+
+    const savingsText = `You saved ${formatCurrency(validation.discountAmount)}${
+      validation.freeDeliveryApplied ? ' + Free Delivery' : ''
+    }`;
+    showToast.success(`${coupon.title}\n${savingsText}`);
+  };
+
+  const handleRemoveCoupon = (couponId: string) => {
+    const coupon = appliedCoupons.find((c) => c.id === couponId);
+    setAppliedCoupons(appliedCoupons.filter((c) => c.id !== couponId));
+
+    if (coupon) {
+      showToast.success(`${coupon.couponCode} removed`);
+    }
+  };
 
   const handleSelectAddress = () => {
     if (!user || user.addresses.length === 0) {
@@ -113,7 +333,7 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
       image: RAZORPAY_CONFIG.businessLogo,
       currency: 'INR',
       key: RAZORPAY_CONFIG.keyId,
-      amount: Math.round(totalAmount * 100), // Amount in paise
+      amount: Math.round(finalPrices.total * 100), // Amount in paise
       name: RAZORPAY_CONFIG.businessName,
       prefill: {
         email: user.email || '',
@@ -146,7 +366,7 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
     }
   };
 
-  const createSubscriptionInDatabase = async () => {
+  const createSubscriptionInDatabase = async (upiTransactionRef?: string) => {
     if (!user || !selectedAddress) {
       throw new Error('User or address not available');
     }
@@ -162,15 +382,30 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
       items: subscriptionItems,
       frequency,
       paymentMethod: paymentMethod,
-      paymentStatus: paymentMethod === PaymentMethod.COD ? PaymentStatus.PENDING : PaymentStatus.PAID,
+      paymentStatus:
+        paymentMethod === PaymentMethod.COD
+          ? PaymentStatus.PENDING
+          : paymentMethod === PaymentMethod.UPI
+          ? PaymentStatus.PENDING_VERIFICATION
+          : PaymentStatus.PAID,
       status: SubscriptionStatus.PENDING,
       deliveryAddress: selectedAddress,
       startDate: dateToTimestamp(startDate),
       endDate: dateToTimestamp(endDate),
+      transactionId: upiTransactionRef,
+      // Coupon data
+      appliedCoupons: appliedCoupons.map((c) => c.couponCode).filter(Boolean) as string[],
+      discountAmount: finalPrices.discount,
+      freeDeliveryApplied: finalPrices.freeDeliveryApplied,
     };
 
     console.log('=== Subscription Creation Debug ===');
-    console.log('Full Subscription Data:', JSON.stringify(subscriptionData, null, 2));
+    console.log('Applied Coupons:', subscriptionData.appliedCoupons);
+    console.log('Discount Amount:', subscriptionData.discountAmount);
+    console.log('Total Amount:', finalPrices.total);
+    if (upiTransactionRef) {
+      console.log('UPI Transaction Ref:', upiTransactionRef);
+    }
     console.log('========================');
 
     try {
@@ -180,11 +415,25 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
       const admins = await getUsersByRole(UserRole.ADMIN);
       const subscription = await getSubscriptionById(subscriptionId);
       for (const admin of admins) {
+        const notificationTitle =
+          paymentMethod === PaymentMethod.UPI
+            ? '⏳ UPI Payment Verification Required (Subscription)'
+            : 'New Subscription Received';
+
+        const notificationMessage =
+          paymentMethod === PaymentMethod.UPI
+            ? `Subscription ${subscription?.subscriptionNumber} - Customer claims UPI payment of ${formatCurrency(
+                finalPrices.total
+              )}. Please verify.`
+            : `Subscription ${subscription?.subscriptionNumber} created for ${formatCurrency(
+                finalPrices.total
+              )}`;
+
         await createNotification(
           admin.id,
           NotificationType.SUBSCRIPTION_CREATED,
-          'New Subscription Received',
-          `Subscription ${subscription?.subscriptionNumber} created`,
+          notificationTitle,
+          notificationMessage,
           { subscriptionId, metadata: { subscriptionNumber: subscription?.subscriptionNumber } }
         );
       }
@@ -193,8 +442,6 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
       return subscriptionId;
     } catch (error: any) {
       console.error('❌ Subscription creation failed:', error);
-      console.error('Error code:', error.code);
-      console.error('Error message:', error.message);
       throw error;
     }
   };
@@ -211,30 +458,45 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
       return;
     }
 
+    // Handle UPI QR payment flow
+    if (paymentMethod === PaymentMethod.UPI) {
+      const tempSubId = `TEMP-SUB-${Date.now()}`;
+      const txnRef = generateTransactionRef();
+      const upiStr = generateUPIString(finalPrices.total, tempSubId, user.name);
+
+      setTransactionRef(txnRef);
+      setUpiString(upiStr);
+      setShowUPIModal(true);
+      return;
+    }
+
     setLoading(true);
     try {
-      const subscriptionItems: SubscriptionItem[] = items.map((item: CheckoutItem) => ({
-        productId: item.productId,
-        quantity: item.quantity,
-      }));
-
       if (paymentMethod === 'online') {
         // Process online payment first
         try {
           const paymentResult = await handleRazorpayPayment();
-          
+
           // Payment successful, create subscription
           const subscriptionId = await createSubscriptionInDatabase();
-          
+
+          const savingsMessage =
+            finalPrices.discount > 0 ? `\n\nYou saved ${formatCurrency(finalPrices.discount)}!` : '';
+
           Alert.alert(
             'Subscription Created! 🎉',
-            `Payment Successful!\n\n📦 Deliveries: ${totalDeliveries}\n💰 Amount Paid: ${formatCurrency(totalAmount)}\n📅 First delivery: ${formatDate(dateToTimestamp(startDate))}\n\nPayment ID: ${paymentResult.paymentId.slice(0, 12)}...`,
+            `Payment Successful!\n\n📦 Deliveries: ${totalDeliveries}\n💰 Amount Paid: ${formatCurrency(
+              finalPrices.total
+            )}\n📅 First delivery: ${formatDate(
+              dateToTimestamp(startDate)
+            )}\n\nPayment ID: ${paymentResult.paymentId.slice(0, 12)}...${savingsMessage}`,
             [
               {
                 text: 'View Subscriptions',
-                onPress: () => navigation.navigate('SubscriptionsTab', {
-                  screen: 'SubscriptionsList',
-                }),
+                onPress: () =>
+                  navigation.navigate('SubscriptionsTab', {
+                    screen: 'SubscriptionsList',
+                  }),
               },
               {
                 text: 'Continue Shopping',
@@ -243,10 +505,7 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
             ]
           );
         } catch (paymentError: any) {
-          Alert.alert(
-            'Payment Failed',
-            paymentError.message || 'Unable to process payment. Please try again.'
-          );
+          showToast.error(paymentError.message || 'Unable to process payment');
           setLoading(false);
           return;
         }
@@ -254,15 +513,23 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
         // Cash on Delivery
         const subscriptionId = await createSubscriptionInDatabase();
 
+        const savingsMessage =
+          finalPrices.discount > 0 ? `\n\nYou saved ${formatCurrency(finalPrices.discount)}!` : '';
+
         Alert.alert(
           'Subscription Created! 🎉',
-          `📦 Deliveries: ${totalDeliveries}\n💰 Total Amount: ${formatCurrency(totalAmount)}\n💵 Payment: Cash on Delivery\n📅 First delivery: ${formatDate(dateToTimestamp(startDate))}`,
+          `📦 Deliveries: ${totalDeliveries}\n💰 Total Amount: ${formatCurrency(
+            finalPrices.total
+          )}\n💵 Payment: Cash on Delivery\n📅 First delivery: ${formatDate(
+            dateToTimestamp(startDate)
+          )}${savingsMessage}`,
           [
             {
               text: 'View Subscriptions',
-              onPress: () => navigation.navigate('SubscriptionsTab', {
-                screen: 'SubscriptionsList',
-              }),
+              onPress: () =>
+                navigation.navigate('SubscriptionsTab', {
+                  screen: 'SubscriptionsList',
+                }),
             },
             {
               text: 'Continue Shopping',
@@ -273,10 +540,89 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
       }
     } catch (error: any) {
       console.error('Error creating subscription:', error);
-      Alert.alert('Error', error.message || 'Failed to create subscription');
+      showToast.error(error.message || 'Failed to create subscription');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleUPIPaymentDone = async () => {
+    if (!upiPaymentAcknowledged) {
+      showToast.error('Please confirm that you have completed the payment');
+      return;
+    }
+
+    setLoading(true);
+    setShowUPIModal(false);
+
+    try {
+      const subscriptionId = await createSubscriptionInDatabase(transactionRef);
+
+      const savingsMessage =
+        finalPrices.discount > 0 ? `\n\nYou saved ${formatCurrency(finalPrices.discount)}!` : '';
+
+      Alert.alert(
+        'Subscription Submitted! ⏳',
+        `Your subscription has been submitted and is awaiting payment verification.\n\nSubscription ID: ${subscriptionId.slice(
+          0,
+          8
+        )}\nTransaction Ref: ${transactionRef}\n\nYour subscription will be activated once admin verifies the payment.${savingsMessage}`,
+        [
+          {
+            text: 'View Subscriptions',
+            onPress: () =>
+              navigation.navigate('SubscriptionsTab', {
+                screen: 'SubscriptionsList',
+              }),
+          },
+          {
+            text: 'OK',
+            onPress: () => navigation.navigate('HomeTab'),
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('Error creating subscription:', error);
+      showToast.error('Failed to create subscription. Please try again.');
+    } finally {
+      setLoading(false);
+      setUpiPaymentAcknowledged(false);
+    }
+  };
+
+  const handleOpenUPIApp = () => {
+    Linking.openURL(upiString).catch((err) => {
+      console.error('Error opening UPI app:', err);
+      showToast.error('Unable to open UPI app. Please scan the QR code manually.');
+    });
+  };
+
+  const getCouponSavingsText = (coupon: Offer) => {
+    const cartItems = items.map((item: CheckoutItem) => ({
+      productId: item.productId,
+      quantity: item.quantity,
+      product: {
+        name: item.productName,
+        price: item.price,
+        priceExcludingTax: item.priceExcludingTax,
+        taxCGST: item.taxCGST,
+        taxSGST: item.taxSGST,
+      },
+    }));
+
+    const validation = calculateOfferDiscount(cartItems, coupon, initialTaxBreakdown.subtotal);
+
+    if (!validation.isValid) return '';
+
+    let text = `Save ${formatCurrency(validation.discountAmount)}`;
+    if (validation.freeDeliveryApplied || coupon.includesFreeDelivery) {
+      text += ' + Free Delivery';
+    }
+    return text;
+  };
+
+  const isCouponApplied = (couponId: string) => {
+    return appliedCoupons.some((c) => c.id === couponId);
   };
 
   if (!user) {
@@ -335,6 +681,77 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
           )}
         </View>
 
+        {/* Coupons Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>🎟️ Apply Coupons</Text>
+            {!loadingCoupons && availableCoupons.length > 0 && (
+              <TouchableOpacity onPress={() => setShowCouponModal(true)}>
+                <Text style={styles.viewAllText}>
+                  View All ({availableCoupons.length})
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {loadingCoupons ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color="#4CAF50" />
+              <Text style={styles.loadingText}>Loading coupons...</Text>
+            </View>
+          ) : appliedCoupons.length > 0 ? (
+            <View style={styles.appliedCouponsContainer}>
+              <View style={styles.appliedCouponsRow}>
+                <View style={styles.appliedCouponsLeft}>
+                  <Text style={styles.appliedCouponsLabel}>
+                    🎟️ Coupons Applied:
+                  </Text>
+                  <View style={styles.couponCodesRow}>
+                    {appliedCoupons.map((coupon, index) => (
+                      <View key={coupon.id} style={styles.couponCodeChip}>
+                        <Text style={styles.couponCodeText}>{coupon.couponCode}</Text>
+                        {coupon.couponCode !== 'FREEDELIVERY' && (
+                          <TouchableOpacity
+                            onPress={() => handleRemoveCoupon(coupon.id)}
+                            style={styles.removeChipButton}
+                          >
+                            <Text style={styles.removeChipText}>✕</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                </View>
+                <TouchableOpacity onPress={() => setShowCouponModal(true)}>
+                  <Text style={styles.changeText}>Change</Text>
+                </TouchableOpacity>
+              </View>
+              {finalPrices.discount > 0 && (
+                <Text style={styles.savingsSmallText}>
+                  💰 Saving {formatCurrency(finalPrices.discount)}
+                </Text>
+              )}
+            </View>
+          ) : availableCoupons.length > 0 ? (
+            <TouchableOpacity
+              style={styles.applyCouponButton}
+              onPress={() => setShowCouponModal(true)}
+            >
+              <Text style={styles.applyCouponIcon}>🎟️</Text>
+              <Text style={styles.applyCouponText}>
+                Apply Coupon ({availableCoupons.length} available)
+              </Text>
+              <Text style={styles.applyCouponChevron}>›</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.noCouponsCard}>
+              <Text style={styles.noCouponsText}>
+                No coupons available for this order
+              </Text>
+            </View>
+          )}
+        </View>
+
         {/* Payment Method Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>💳 Payment Method</Text>
@@ -361,7 +778,32 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
             <Text style={styles.paymentOptionIcon}>💵</Text>
           </TouchableOpacity>
 
-          {/* Online Payment */}
+          {/* UPI QR Payment */}
+          <TouchableOpacity
+            style={[
+              styles.paymentOption,
+              paymentMethod === PaymentMethod.UPI && styles.paymentOptionActive,
+            ]}
+            onPress={() => setPaymentMethod(PaymentMethod.UPI)}
+          >
+            <View style={styles.paymentOptionContent}>
+              <View style={styles.radioButton}>
+                {paymentMethod === PaymentMethod.UPI && <View style={styles.radioButtonInner} />}
+              </View>
+              <View style={styles.paymentOptionDetails}>
+                <Text style={styles.paymentOptionTitle}>UPI Payment</Text>
+                <Text style={styles.paymentOptionSubtitle}>
+                  Pay via GPay, PhonePe, Paytm, etc.
+                </Text>
+                <View style={styles.savingsTagContainer}>
+                  <Text style={styles.savingsTag}>💰 Save 2% (No gateway fees)</Text>
+                </View>
+              </View>
+            </View>
+            <Text style={styles.paymentOptionIcon}>📱</Text>
+          </TouchableOpacity>
+
+          {/* Online Payment (Razorpay) */}
           <TouchableOpacity
             style={[
               styles.paymentOption,
@@ -376,7 +818,7 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
               <View style={styles.paymentOptionDetails}>
                 <Text style={styles.paymentOptionTitle}>Online Payment</Text>
                 <Text style={styles.paymentOptionSubtitle}>
-                  UPI, Cards, Wallets (Coming Soon)
+                  UPI, Cards, Wallets via Razorpay
                 </Text>
               </View>
             </View>
@@ -427,9 +869,9 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
           ))}
         </View>
 
-        {/* Price Summary */}
+        {/* Price Breakdown */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>💰 Payment Summary</Text>
+          <Text style={styles.sectionTitle}>💰 Price Breakdown</Text>
           <View style={styles.priceCard}>
             <View style={styles.priceRow}>
               <Text style={styles.priceLabel}>Per Delivery</Text>
@@ -438,21 +880,77 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
               </Text>
             </View>
             <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>Number of Deliveries</Text>
-              <Text style={styles.priceValue}>{totalDeliveries}</Text>
+              <Text style={styles.priceLabel}>Subtotal (excl. tax)</Text>
+              <Text style={styles.priceValue}>{formatCurrency(finalPrices.subtotal)}</Text>
             </View>
+
+            {finalPrices.discount > 0 && (
+              <View style={[styles.priceRow, styles.discountRow]}>
+                <Text style={styles.discountLabel}>Coupon Discount</Text>
+                <Text style={styles.discountValue}>- {formatCurrency(finalPrices.discount)}</Text>
+              </View>
+            )}
+
+            {finalPrices.discount > 0 && (
+              <View style={styles.priceRow}>
+                <Text style={styles.priceLabel}>Subtotal after discount</Text>
+                <Text style={styles.priceValue}>
+                  {formatCurrency(finalPrices.subtotalAfterDiscount)}
+                </Text>
+              </View>
+            )}
+
+            {finalPrices.cgst > 0 && (
+              <View style={styles.priceRow}>
+                <Text style={styles.priceLabel}>CGST</Text>
+                <Text style={styles.priceValue}>{formatCurrency(finalPrices.cgst)}</Text>
+              </View>
+            )}
+
+            {finalPrices.sgst > 0 && (
+              <View style={styles.priceRow}>
+                <Text style={styles.priceLabel}>SGST</Text>
+                <Text style={styles.priceValue}>{formatCurrency(finalPrices.sgst)}</Text>
+              </View>
+            )}
+
+            <View style={styles.priceRow}>
+              <Text style={styles.priceLabel}>Platform Fee</Text>
+              <Text style={styles.priceValue}>{formatCurrency(finalPrices.platformFee)}</Text>
+            </View>
+
             <View style={styles.priceRow}>
               <Text style={styles.priceLabel}>Delivery Charges</Text>
-              <Text style={styles.priceFree}>FREE</Text>
+              {finalPrices.freeDeliveryApplied && baseDeliveryFee > 0 ? (
+                <View style={styles.freeDeliveryContainer}>
+                  <Text style={styles.strikethrough}>{formatCurrency(baseDeliveryFee)}</Text>
+                  <Text style={styles.priceFree}>FREE</Text>
+                </View>
+              ) : (
+                <Text style={styles.priceFree}>
+                  {finalPrices.deliveryFee === 0 ? 'FREE' : formatCurrency(finalPrices.deliveryFee)}
+                </Text>
+              )}
             </View>
+
             <View style={styles.divider} />
+
             <View style={styles.priceRow}>
               <Text style={styles.totalLabel}>Total Amount (Upfront)</Text>
-              <Text style={styles.totalValue}>{formatCurrency(totalAmount)}</Text>
+              <Text style={styles.totalValue}>{formatCurrency(finalPrices.total)}</Text>
             </View>
+
+            {finalPrices.discount > 0 && (
+              <View style={styles.savingsCard}>
+                <Text style={styles.savingsText}>
+                  You're saving {formatCurrency(finalPrices.discount)}!
+                </Text>
+              </View>
+            )}
+
             <View style={styles.paymentNote}>
               <Text style={styles.paymentNoteText}>
-                💳 Full payment collected in advance
+                💳 Full payment collected in advance for {totalDeliveries} deliveries
               </Text>
             </View>
           </View>
@@ -464,14 +962,16 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
       {/* Create Subscription Button */}
       <View style={styles.footer}>
         <View style={styles.footerInfo}>
-          <Text style={styles.footerLabel}>Total</Text>
-          <Text style={styles.footerPrice}>{formatCurrency(totalAmount)}</Text>
+          <View>
+            <Text style={styles.footerLabel}>Total</Text>
+            {finalPrices.discount > 0 && (
+              <Text style={styles.footerSavings}>Saved {formatCurrency(finalPrices.discount)}</Text>
+            )}
+          </View>
+          <Text style={styles.footerPrice}>{formatCurrency(finalPrices.total)}</Text>
         </View>
         <TouchableOpacity
-          style={[
-            styles.createButton,
-            (!selectedAddress || loading) && styles.buttonDisabled,
-          ]}
+          style={[styles.createButton, (!selectedAddress || loading) && styles.buttonDisabled]}
           onPress={handleCreateSubscription}
           disabled={!selectedAddress || loading}
         >
@@ -479,13 +979,254 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
             <ActivityIndicator color="#fff" />
           ) : (
             <Text style={styles.createButtonText}>
-              {paymentMethod === 'cod'
-                ? `Pay ${formatCurrency(totalAmount)} (COD)`
+              {paymentMethod === PaymentMethod.COD
+                ? `Pay ${formatCurrency(finalPrices.total)} (COD)`
+                : paymentMethod === PaymentMethod.UPI
+                ? `Pay ${formatCurrency(finalPrices.total)} via UPI`
                 : 'Proceed to Payment'}
             </Text>
           )}
         </TouchableOpacity>
       </View>
+
+      {/* UPI QR Payment Modal */}
+      <Modal
+        visible={showUPIModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => {
+          if (!loading) {
+            setShowUPIModal(false);
+            setUpiPaymentAcknowledged(false);
+          }
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.upiModalContent}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Pay via UPI</Text>
+              {!loading && (
+                <TouchableOpacity onPress={() => {
+                  setShowUPIModal(false);
+                  setUpiPaymentAcknowledged(false);
+                }}>
+                  <Text style={styles.modalClose}>✕</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* UPI Payment Content */}
+            <ScrollView style={styles.upiModalScroll} contentContainerStyle={styles.upiModalScrollContent}>
+              {/* Amount Display */}
+              <View style={styles.upiAmountCard}>
+                <Text style={styles.upiAmountLabel}>Subscription Amount</Text>
+                <Text style={styles.upiAmount}>{formatCurrency(finalPrices.total)}</Text>
+                <Text style={styles.upiAmountNote}>
+                  {totalDeliveries} deliveries • {getFrequencyText(frequency)}
+                </Text>
+              </View>
+
+              {/* QR Code */}
+              <View style={styles.qrContainer}>
+                <View style={styles.qrCodeWrapper}>
+                  {upiString && (
+                    <QRCode
+                      value={upiString}
+                      size={220}
+                      backgroundColor="white"
+                      color="#1a1a1a"
+                    />
+                  )}
+                </View>
+                <Text style={styles.qrInstructions}>
+                  Scan this QR code with any UPI app
+                </Text>
+              </View>
+
+              {/* UPI Apps */}
+              <View style={styles.upiAppsContainer}>
+                <Text style={styles.upiAppsLabel}>Supported UPI Apps</Text>
+                <View style={styles.upiAppsList}>
+                  {['GPay', 'PhonePe', 'Paytm', 'BHIM', 'Amazon Pay'].map((app) => (
+                    <View key={app} style={styles.upiAppChip}>
+                      <Text style={styles.upiAppText}>{app}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+
+              {/* OR Divider */}
+              <View style={styles.orDivider}>
+                <View style={styles.orLine} />
+                <Text style={styles.orText}>OR</Text>
+                <View style={styles.orLine} />
+              </View>
+
+              {/* Open UPI App Button */}
+              <TouchableOpacity
+                style={styles.openUPIButton}
+                onPress={handleOpenUPIApp}
+              >
+                <Text style={styles.openUPIButtonText}>📱 Open in UPI App</Text>
+              </TouchableOpacity>
+
+              {/* Transaction Reference */}
+              <View style={styles.transactionRefCard}>
+                <Text style={styles.transactionRefLabel}>Transaction Reference</Text>
+                <Text style={styles.transactionRefText}>{transactionRef}</Text>
+                <Text style={styles.transactionRefNote}>
+                  Save this reference for future queries
+                </Text>
+              </View>
+
+              {/* Payment Instructions */}
+              <View style={styles.instructionsCard}>
+                <Text style={styles.instructionsTitle}>Payment Instructions:</Text>
+                <View style={styles.instructionsList}>
+                  <Text style={styles.instructionItem}>1️⃣ Scan QR code or open in UPI app</Text>
+                  <Text style={styles.instructionItem}>2️⃣ Complete payment in your UPI app</Text>
+                  <Text style={styles.instructionItem}>3️⃣ Check the confirmation box below</Text>
+                  <Text style={styles.instructionItem}>4️⃣ Click "Submit Subscription" button</Text>
+                </View>
+              </View>
+
+              {/* Payment Confirmation Checkbox */}
+              <TouchableOpacity
+                style={styles.confirmationCheckbox}
+                onPress={() => setUpiPaymentAcknowledged(!upiPaymentAcknowledged)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.checkbox}>
+                  {upiPaymentAcknowledged && (
+                    <Text style={styles.checkmark}>✓</Text>
+                  )}
+                </View>
+                <Text style={styles.confirmationText}>
+                  I have completed the UPI payment of {formatCurrency(finalPrices.total)}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Warning Note */}
+              <View style={styles.warningCard}>
+                <Text style={styles.warningText}>
+                  ⚠️ Your subscription will be activated after admin verifies the payment. This usually takes 5-10 minutes during business hours.
+                </Text>
+              </View>
+            </ScrollView>
+
+            {/* Submit Button */}
+            <View style={styles.upiModalFooter}>
+              <TouchableOpacity
+                style={[
+                  styles.submitUPIButton,
+                  (!upiPaymentAcknowledged || loading) && styles.submitUPIButtonDisabled,
+                ]}
+                onPress={handleUPIPaymentDone}
+                disabled={!upiPaymentAcknowledged || loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.submitUPIButtonText}>
+                    ✅ Submit Subscription
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Coupon Selection Modal */}
+      <Modal
+        visible={showCouponModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowCouponModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Available Coupons</Text>
+              <TouchableOpacity onPress={() => setShowCouponModal(false)}>
+                <Text style={styles.modalClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Coupons List */}
+            <ScrollView style={styles.modalScroll}>
+              {availableCoupons.map((coupon) => {
+                const isApplied = isCouponApplied(coupon.id);
+                //const validation = calculateOfferDiscount(cartItems, coupon, initialTaxBreakdown.subtotal);
+                
+                return (
+                  <View
+                    key={coupon.id}
+                    style={[
+                      styles.couponCard,
+                      { 
+                        backgroundColor: coupon.backgroundColor,
+                        borderColor: isApplied ? '#4CAF50' : 'transparent',
+                        borderWidth: isApplied ? 2 : 0,
+                      }
+                    ]}
+                  >
+                    <View style={styles.couponDashedBorder}>
+                      <View style={styles.couponContent}>
+                        <View style={styles.couponLeft}>
+                          <Text style={[styles.couponTitle, { color: coupon.textColor }]}>
+                            {coupon.title}
+                          </Text>
+                          <Text style={[styles.couponDescription, { color: coupon.textColor }]}>
+                            {coupon.description}
+                          </Text>
+                          
+                          {coupon.couponCode && (
+                            <View style={styles.couponCodeContainer}>
+                              <Text style={[styles.couponCode, { color: coupon.textColor }]}>
+                                {coupon.couponCode}
+                              </Text>
+                            </View>
+                          )}
+                          
+                          <Text style={[styles.savingsText2, { color: coupon.textColor }]}>
+                            💰 {getCouponSavingsText(coupon)}
+                          </Text>
+                          
+                          {/* Applicable categories */}
+                          {coupon.applicableCategories && coupon.applicableCategories.length > 0 && (
+                            <Text style={[styles.categoryText, { color: coupon.textColor }]}>
+                              Valid on: {coupon.applicableCategories.join(', ')}
+                            </Text>
+                          )}
+                        </View>
+
+                        <View style={styles.couponRight}>
+                          {isApplied ? (
+                            <View style={styles.appliedBadge}>
+                              <Text style={styles.appliedBadgeText}>✅</Text>
+                            </View>
+                          ) : (
+                            <TouchableOpacity
+                              style={styles.applyButton}
+                              onPress={() => handleApplyCoupon(coupon)}
+                            >
+                              <Text style={styles.applyButtonText}>Apply</Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 };
@@ -745,6 +1486,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
   },
+  footerSavings: {
+    fontSize: 12,
+    color: '#4CAF50',
+    fontWeight: '600',
+  },
   footerPrice: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -774,6 +1520,539 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 18,
+    color: '#666',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  upiModalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '90%',
+    paddingBottom: 20,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '80%',
+    paddingBottom: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1a1a1a',
+  },
+  modalClose: {
+    fontSize: 28,
+    color: '#999',
+  },
+  upiModalScroll: {
+    maxHeight: '80%',
+  },
+  upiModalScrollContent: {
+    padding: 20,
+  },
+  upiAmountCard: {
+    backgroundColor: '#E8F5E9',
+    padding: 20,
+    borderRadius: 16,
+    alignItems: 'center',
+    marginBottom: 24,
+    borderWidth: 2,
+    borderColor: '#4CAF50',
+  },
+  upiAmountLabel: {
+    fontSize: 14,
+    color: '#2E7D32',
+    marginBottom: 8,
+    fontWeight: '600',
+  },
+  upiAmount: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#1B5E20',
+  },
+  upiAmountNote: {
+    fontSize: 12,
+    color: '#2E7D32',
+    marginTop: 4,
+  },
+  qrContainer: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  qrCodeWrapper: {
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    marginBottom: 16,
+  },
+  qrInstructions: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+  },
+  upiAppsContainer: {
+    marginBottom: 24,
+  },
+  upiAppsLabel: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  upiAppsList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  upiAppChip: {
+    backgroundColor: '#f5f5f5',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  upiAppText: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+  },
+  orDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  orLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#e0e0e0',
+  },
+  orText: {
+    paddingHorizontal: 16,
+    fontSize: 13,
+    color: '#999',
+    fontWeight: '600',
+  },
+  openUPIButton: {
+    backgroundColor: '#5f6368',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  openUPIButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  transactionRefCard: {
+    backgroundColor: '#FFF9C4',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#FBC02D',
+  },
+  transactionRefLabel: {
+    fontSize: 12,
+    color: '#F57F17',
+    marginBottom: 6,
+    fontWeight: '600',
+  },
+  transactionRefText: {
+    fontSize: 16,
+    fontFamily: 'monospace',
+    color: '#1a1a1a',
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  transactionRefNote: {
+    fontSize: 11,
+    color: '#F57F17',
+  },
+  instructionsCard: {
+    backgroundColor: '#E3F2FD',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  instructionsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1565C0',
+    marginBottom: 12,
+  },
+  instructionsList: {
+    gap: 8,
+  },
+  instructionItem: {
+    fontSize: 13,
+    color: '#1976D2',
+    lineHeight: 20,
+  },
+  confirmationCheckbox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#f5f5f5',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    gap: 12,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#4CAF50',
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkmark: {
+    fontSize: 18,
+    color: '#4CAF50',
+    fontWeight: 'bold',
+  },
+  confirmationText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#1a1a1a',
+    lineHeight: 20,
+    fontWeight: '500',
+  },
+  warningCard: {
+    backgroundColor: '#FFF3E0',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FFB300',
+  },
+  warningText: {
+    fontSize: 12,
+    color: '#E65100',
+    lineHeight: 18,
+  },
+  upiModalFooter: {
+    padding: 20,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  submitUPIButton: {
+    backgroundColor: '#4CAF50',
+    padding: 18,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  submitUPIButtonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  submitUPIButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  savingsTagContainer: {
+    marginTop: 4,
+  },
+  savingsTag: {
+    fontSize: 11,
+    color: '#2E7D32',
+    fontWeight: '600',
+  },
+  appliedCouponContent: {
+    flex: 1,
+  },
+  appliedCouponTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  appliedCouponCode: {
+    fontSize: 14,
+    fontFamily: 'monospace',
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  appliedCouponSavings: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  categoryText: {
+    fontSize: 11,
+    opacity: 0.8,
+    marginTop: 4,
+  },
+  removeCouponButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  removeCouponText: {
+    fontSize: 18,
+    color: '#fff',
+  },
+  browseCouponsButton: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#4CAF50',
+    borderStyle: 'dashed',
+    alignItems: 'center',
+  },
+  browseCouponsText: {
+    fontSize: 14,
+    color: '#4CAF50',
+    fontWeight: '600',
+  },
+  applyCouponButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E8F5E9',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#4CAF50',
+    borderStyle: 'dashed',
+  },
+  applyCouponIcon: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  applyCouponText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#4CAF50',
+  },
+  applyCouponChevron: {
+    fontSize: 24,
+    color: '#4CAF50',
+  },
+  noCouponsCard: {
+    padding: 16,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  noCouponsText: {
+    fontSize: 14,
+    color: '#999',
+  },
+  modalScroll: {
+    padding: 16,
+  },
+  couponCard: {
+    borderRadius: 12,
+    marginBottom: 12,
+    overflow: 'hidden',
+  },
+  couponDashedBorder: {
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(0,0,0,0.15)',
+    borderRadius: 12,
+    padding: 14,
+  },
+  couponContent: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  couponLeft: {
+    flex: 1,
+  },
+  couponRight: {
+    justifyContent: 'center',
+  },
+  couponTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 6,
+  },
+  couponDescription: {
+    fontSize: 13,
+    marginBottom: 8,
+    lineHeight: 18,
+  },
+  couponCodeContainer: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.4)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginBottom: 6,
+  },
+  couponCode: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    fontFamily: 'monospace',
+  },
+  applyButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  applyButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  appliedBadge: {
+    backgroundColor: '#4CAF50',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  appliedBadgeText: {
+    fontSize: 24,
+  },
+  appliedCouponsContainer: {
+    backgroundColor: '#E8F5E9',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+  },
+  appliedCouponsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 6,
+  },
+  appliedCouponsLeft: {
+    flex: 1,
+  },
+  appliedCouponsLabel: {
+    fontSize: 13,
+    color: '#2E7D32',
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  couponCodesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  couponCodeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    gap: 6,
+  },
+  couponCodeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+    fontFamily: 'monospace',
+  },
+  removeChipButton: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  removeChipText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  savingsSmallText: {
+    fontSize: 12,
+    color: '#2E7D32',
+    fontWeight: '600',
+  },
+  discountRow: {
+    backgroundColor: '#E8F5E9',
+    marginHorizontal: -16,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  discountLabel: {
+    fontSize: 14,
+    color: '#2E7D32',
+    fontWeight: '600',
+  },
+  discountValue: {
+    fontSize: 14,
+    color: '#2E7D32',
+    fontWeight: '700',
+  },
+  freeDeliveryContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  strikethrough: {
+    fontSize: 12,
+    color: '#999',
+    textDecorationLine: 'line-through',
+  },
+  savingsCard: {
+    backgroundColor: '#4CAF50',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  savingsText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  savingsText2: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  viewAllText: {
+    fontSize: 13,
+    color: '#4CAF50',
+    fontWeight: '600',
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+  },
+  loadingText: {
+    fontSize: 14,
     color: '#666',
   },
 });

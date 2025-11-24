@@ -9,7 +9,8 @@ import {
   toggleOfferStatus,
   Offer,
   formatDate,
-  ProductCategory
+  ProductCategory,
+  OfferApplicability,
 } from '@ecommerce/shared';
 import { showToast } from '@/lib/toast';
 import { off } from 'process';
@@ -37,6 +38,7 @@ export default function OffersManagementPage() {
     maxDiscount: '',
     applicableCategories: [] as ProductCategory[],
     includesFreeDelivery: false,
+    applicability: OfferApplicability.BOTH as OfferApplicability,
   });
 
   useEffect(() => {
@@ -73,6 +75,7 @@ export default function OffersManagementPage() {
       maxDiscount: '',
       applicableCategories: [],
       includesFreeDelivery: false,
+      applicability: OfferApplicability.BOTH,
     });
     setEditingOffer(null);
     setShowForm(false);
@@ -96,6 +99,7 @@ export default function OffersManagementPage() {
       maxDiscount: offer.maxDiscount?.toString() || '',
       applicableCategories: offer.applicableCategories || [],
       includesFreeDelivery: offer.includesFreeDelivery || false,
+      applicability: offer.applicability || OfferApplicability.BOTH,
     });
     setShowForm(true);
   };
@@ -122,6 +126,7 @@ export default function OffersManagementPage() {
         displayOrder: formData.displayOrder,
         applicableCategories: formData.applicableCategories,
         includesFreeDelivery: formData.includesFreeDelivery,
+        applicability: formData.applicability,
       };
 
       if (formData.discountPercentage) {
@@ -413,60 +418,108 @@ export default function OffersManagementPage() {
               </div>
 
               {/* Applicable Categories */}
-<div>
-  <label className="label">Applicable Categories (leave empty for all products)</label>
-  <div className="space-y-2">
-    {Object.values(ProductCategory).map((category) => (
-      <label key={category} className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          checked={formData.applicableCategories?.includes(category) || false}
-          onChange={(e) => {
-            const current = formData.applicableCategories || [];
-            if (e.target.checked) {
-              setFormData({
-                ...formData,
-                applicableCategories: [...current, category],
-              });
-            } else {
-              setFormData({
-                ...formData,
-                applicableCategories: current.filter(c => c !== category),
-              });
-            }
-          }}
-          className="w-4 h-4 text-green-600 rounded"
-        />
-        <span className="text-sm text-gray-700 capitalize">
-          {getProductEmoji(category)} {category}
-        </span>
-      </label>
-    ))}
-  </div>
-  <p className="text-xs text-gray-500 mt-2">
-    If no categories selected, offer applies to all products
-  </p>
-</div>
+              <div>
+                <label className="label">Applicable Categories (leave empty for all products)</label>
+                <div className="space-y-2">
+                  {Object.values(ProductCategory).map((category) => (
+                    <label key={category} className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={formData.applicableCategories?.includes(category) || false}
+                        onChange={(e) => {
+                          const current = formData.applicableCategories || [];
+                          if (e.target.checked) {
+                            setFormData({
+                              ...formData,
+                              applicableCategories: [...current, category],
+                            });
+                          } else {
+                            setFormData({
+                              ...formData,
+                              applicableCategories: current.filter(c => c !== category),
+                            });
+                          }
+                        }}
+                        className="w-4 h-4 text-green-600 rounded"
+                      />
+                      <span className="text-sm text-gray-700 capitalize">
+                        {getProductEmoji(category)} {category}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  If no categories selected, offer applies to all products
+                </p>
+              </div>
 
-{/* Free Delivery Option */}
-<div className="pt-4 border-t border-gray-200">
-  <label className="flex items-center gap-3 cursor-pointer">
-    <input
-      type="checkbox"
-      checked={formData.includesFreeDelivery}
-      onChange={(e) => setFormData({ ...formData, includesFreeDelivery: e.target.checked })}
-      className="w-4 h-4 text-green-600 rounded"
-    />
-    <div>
-      <span className="text-sm font-medium text-gray-700">
-        Includes Free Delivery
-      </span>
-      <p className="text-xs text-gray-500">
-        This offer also provides free delivery to the customer
-      </p>
-    </div>
-  </label>
-</div>
+              {/* Applicability - Orders vs Subscriptions */}
+              <div className="pt-4 border-t border-gray-200">
+                <label className="label">Applicable To</label>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+                    <input
+                      type="radio"
+                      name="applicability"
+                      checked={formData.applicability === OfferApplicability.ORDERS_ONLY}
+                      onChange={() => setFormData({ ...formData, applicability: OfferApplicability.ORDERS_ONLY })}
+                      className="w-4 h-4 text-green-600"
+                    />
+                    <div className="flex-1">
+                      <span className="text-sm font-medium text-gray-900">📦 One-Time Orders Only</span>
+                      <p className="text-xs text-gray-600">This coupon can only be used for regular orders</p>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+                    <input
+                      type="radio"
+                      name="applicability"
+                      checked={formData.applicability === OfferApplicability.SUBSCRIPTIONS_ONLY}
+                      onChange={() => setFormData({ ...formData, applicability: OfferApplicability.SUBSCRIPTIONS_ONLY })}
+                      className="w-4 h-4 text-green-600"
+                    />
+                    <div className="flex-1">
+                      <span className="text-sm font-medium text-gray-900">📅 Subscriptions Only</span>
+                      <p className="text-xs text-gray-600">This coupon can only be used for subscriptions</p>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+                    <input
+                      type="radio"
+                      name="applicability"
+                      checked={formData.applicability === OfferApplicability.BOTH}
+                      onChange={() => setFormData({ ...formData, applicability: OfferApplicability.BOTH })}
+                      className="w-4 h-4 text-green-600"
+                    />
+                    <div className="flex-1">
+                      <span className="text-sm font-medium text-gray-900">🎯 Both Orders & Subscriptions</span>
+                      <p className="text-xs text-gray-600">Can be used for any purchase type</p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Free Delivery Option */}
+              <div className="pt-4 border-t border-gray-200">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.includesFreeDelivery}
+                    onChange={(e) => setFormData({ ...formData, includesFreeDelivery: e.target.checked })}
+                    className="w-4 h-4 text-green-600 rounded"
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-gray-700">
+                      Includes Free Delivery
+                    </span>
+                    <p className="text-xs text-gray-500">
+                      This offer also provides free delivery to the customer
+                    </p>
+                  </div>
+                </label>
+              </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -556,6 +609,17 @@ export default function OffersManagementPage() {
                     <div className="inline-block bg-white bg-opacity-30 rounded px-3 py-1">
                       <span className="font-mono font-bold">{formData.couponCode}</span>
                     </div>
+                  )}
+
+                  {formData.applicability === OfferApplicability.ORDERS_ONLY && (
+                    <span className="text-xs px-2 py-1 rounded-full bg-orange-100 text-orange-800">
+                      📦 Orders Only
+                    </span>
+                  )}
+                  {formData.applicability === OfferApplicability.SUBSCRIPTIONS_ONLY && (
+                    <span className="text-xs px-2 py-1 rounded-full bg-indigo-100 text-indigo-800">
+                      📅 Subscriptions Only
+                    </span>
                   )}
                 </div>
               </div>

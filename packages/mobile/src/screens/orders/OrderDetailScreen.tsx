@@ -125,6 +125,28 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
     }
   };
 
+  const getPaymentMethodLabel = (method?: string) => {
+    const labels: Record<string, string> = {
+      cod: '💵 Cash on Delivery',
+      online: '💳 Online Payment',
+      upi: '🔳 UPI Payment',
+    };
+    return labels[method || 'cod'] || '💵 Cash on Delivery';
+  };
+
+  const getPaymentStatusBadge = (status?: string) => {
+    
+    const labels: Record<string, string> = {
+      pending: '⏳ Pending',
+      pending_verification: '⏳ Pending Verification',
+      paid: '✅ Paid',
+      failed: '❌ Failed',
+    };
+    
+    const statusKey = status || 'pending';
+    return labels[statusKey];
+  };
+
   if (loading) {
     return (
       <View style={styles.centerContainer}>
@@ -363,11 +385,33 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
             
             <View style={styles.paymentMethodCard}>
               <Text style={styles.paymentMethodText}>
-                💵 Payment Method: Cash on Delivery
+                {getPaymentMethodLabel(order.paymentMethod)}
+              </Text>
+              <Text style={styles.paymentMethodText}>
+                {getPaymentStatusBadge(order.paymentStatus)}
               </Text>
             </View>
           </View>
         </View>
+
+        {/* Payment Status Card - For UPI pending verification */}
+        {order.paymentStatus === 'pending_verification' && (
+          <View style={styles.upiPendingCard}>
+            <View style={styles.upiPendingHeader}>
+              <Text style={styles.upiPendingIcon}>⏳</Text>
+              <Text style={styles.upiPendingTitle}>Payment Under Verification</Text>
+            </View>
+            <Text style={styles.upiPendingText}>
+              Your UPI payment is being verified by our team. This usually takes 5-10 minutes.
+            </Text>
+            {order.transactionId && (
+              <View style={styles.transactionRefSmall}>
+                <Text style={styles.transactionRefLabelSmall}>Ref:</Text>
+                <Text style={styles.transactionRefTextSmall}>{order.transactionId}</Text>
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Help Section */}
         <View style={styles.section}>
@@ -652,6 +696,49 @@ const styles = StyleSheet.create({
   backButtonText: {
     color: '#fff',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  upiPendingCard: {
+    backgroundColor: '#FFF9C4',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: '#FBC02D',
+  },
+  upiPendingHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  upiPendingIcon: {
+    fontSize: 24,
+  },
+  upiPendingTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#F57F17',
+  },
+  upiPendingText: {
+    fontSize: 13,
+    color: '#E65100',
+    lineHeight: 18,
+    marginBottom: 8,
+  },
+  transactionRefSmall: {
+    flexDirection: 'row',
+    gap: 4,
+    marginTop: 4,
+  },
+  transactionRefLabelSmall: {
+    fontSize: 11,
+    color: '#F57F17',
+  },
+  transactionRefTextSmall: {
+    fontSize: 11,
+    fontFamily: 'monospace',
+    color: '#1a1a1a',
     fontWeight: '600',
   },
 });

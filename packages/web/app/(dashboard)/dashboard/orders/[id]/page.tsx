@@ -24,6 +24,9 @@ import {
   DELIVERY_FEE,
   NotificationType,
   createNotification,
+  verifyUPIPayment,
+  UPI_CONFIG,
+  PaymentStatus,
 } from '@ecommerce/shared';
 import { showToast } from '@/lib/toast';
 import { generateOrderInvoicePDF } from '@/lib/invoice-generator';
@@ -364,12 +367,14 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
   const getPaymentStatusBadge = (status?: string) => {
     const styles: Record<string, string> = {
       pending: 'bg-yellow-100 text-yellow-800',
+      pending_verification: 'bg-yellow-100 text-yellow-800',
       paid: 'bg-green-100 text-green-800',
       failed: 'bg-red-100 text-red-800',
     };
     
     const labels: Record<string, string> = {
       pending: '⏳ Pending',
+      pending_verification: '⏳ Pending Verification',
       paid: '✅ Paid',
       failed: '❌ Failed',
     };
@@ -853,7 +858,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                         onClick={() => {
                           setEditingPayment(false);
                           setPaymentMethodValue(order.paymentMethod || 'cod');
-                          setPaymentStatusValue(order.paymentStatus || 'pending');
+                          setPaymentStatusValue(order.paymentStatus || PaymentStatus.PENDING);
                         }}
                         disabled={savingPayment}
                         className="text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
@@ -867,6 +872,14 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                     <p className="font-semibold text-gray-900">
                       {getPaymentMethodLabel(order.paymentMethod)}
                     </p>
+
+                    {order.paymentMethod === 'upi' && order.transactionId && (
+                      <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                        <p className="text-sm text-yellow-800 mb-1">UPI Transaction Reference</p>
+                        <p className="font-mono font-semibold text-yellow-900">{order.transactionId}</p>
+                      </div>
+                    )}
+
                     <div className="mt-2">
                       {getPaymentStatusBadge(order.paymentStatus)}
                     </div>
@@ -939,6 +952,90 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                     <span>{updating ? 'Updating...' : 'Mark as Delivered'}</span>
                   </button>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* UPI Payment Verification - Show for pending_verification */}
+          {order.paymentStatus === 'pending_verification' && (
+            <div className="card bg-yellow-50 border-2 border-yellow-400">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-3xl">⏳</span>
+                <h3 className="text-lg font-bold text-yellow-900">
+                  UPI Payment Verification Required
+                </h3>
+              </div>
+              
+              <div className="bg-white rounded-lg p-4 mb-4">
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <p className="text-gray-600 mb-1">Amount</p>
+                    <p className="font-bold text-gray-900">{formatCurrency(order.totalAmount)}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600 mb-1">Transaction Ref</p>
+                    <p className="font-mono text-sm text-gray-900">{order.transactionId || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600 mb-1">UPI ID</p>
+                    <p className="font-mono text-sm text-gray-900">{UPI_CONFIG.upiId}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600 mb-1">Order Time</p>
+                    <p className="text-sm text-gray-900">{formatDateTime(order.createdAt)}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                <p className="text-sm text-blue-800">
+                  ℹ️ Please check your bank account or UPI app transaction history to verify this payment before confirming.
+                </p>
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={async () => {
+                    if (!confirm('Confirm that you have verified the UPI payment in your bank account?')) return;
+                    
+                    const toastId = showToast.loading('Verifying payment...');
+                    try {
+                      await verifyUPIPayment(order.id, true);
+                      showToast.dismiss(toastId);
+                      showToast.success('Payment verified and order confirmed!');
+                      await loadOrder();
+                    } catch (error) {
+                      showToast.dismiss(toastId);
+                      showToast.error('Failed to verify payment');
+                    }
+                  }}
+                  className="btn-primary flex-1 flex items-center justify-center gap-2"
+                >
+                  <span>✅</span>
+                  <span>Verify & Confirm Payment</span>
+                </button>
+                
+                <button
+                  onClick={async () => {
+                    const reason = prompt('Reason for payment failure (optional):');
+                    if (!confirm('Mark this payment as failed? This will cancel the order.')) return;
+                    
+                    const toastId = showToast.loading('Processing...');
+                    try {
+                      await verifyUPIPayment(order.id, false, reason || undefined);
+                      showToast.dismiss(toastId);
+                      showToast.success('Payment marked as failed, order cancelled');
+                      await loadOrder();
+                    } catch (error) {
+                      showToast.dismiss(toastId);
+                      showToast.error('Failed to update payment status');
+                    }
+                  }}
+                  className="btn-danger flex-1 flex items-center justify-center gap-2"
+                >
+                  <span>❌</span>
+                  <span>Payment Not Received</span>
+                </button>
               </div>
             </div>
           )}

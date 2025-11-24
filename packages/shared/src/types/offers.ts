@@ -1,6 +1,12 @@
 import { Timestamp } from 'firebase/firestore';
 import { ProductCategory } from './index';
 
+export enum OfferApplicability {
+  ORDERS_ONLY = 'orders_only',
+  SUBSCRIPTIONS_ONLY = 'subscriptions_only',
+  BOTH = 'both',
+}
+
 export interface Offer {
   id: string;
   title: string;
@@ -20,6 +26,7 @@ export interface Offer {
   applicableCategories?: ProductCategory[]; // Product IDs
   minOrderAmount?: number;
   maxDiscount?: number;
+  applicability: OfferApplicability; // orders, subscriptions, or both
 
   // Special features
   includesFreeDelivery?: boolean; // Can be combined with discount

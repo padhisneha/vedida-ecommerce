@@ -1,3 +1,4 @@
+// CreateSubscriptionScreen.tsx
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -20,6 +21,9 @@ import {
   UserAddress,
   formatCurrency,
   dateToTimestamp,
+  PLATFORM_FEE,
+  calculateOrderTotal,
+  TaxBreakdown,
 } from '@ecommerce/shared';
 
 interface SubscriptionItem {
@@ -104,11 +108,38 @@ export const CreateSubscriptionScreen = ({ navigation }: any) => {
     return item?.quantity || 0;
   };
 
+  // Calculate per delivery tax breakdown
+  const calculatePerDeliveryTaxBreakdown = (): TaxBreakdown => {
+    let subtotal = 0;
+    let cgst = 0;
+    let sgst = 0;
+
+    selectedItems.forEach((item) => {
+      const itemSubtotal = item.product.priceExcludingTax * item.quantity;
+      const itemCGST = (itemSubtotal * item.product.taxCGST) / 100;
+      const itemSGST = (itemSubtotal * item.product.taxSGST) / 100;
+
+      subtotal += itemSubtotal;
+      cgst += itemCGST;
+      sgst += itemSGST;
+    });
+
+    const totalTax = cgst + sgst;
+    const totalBeforeFees = subtotal + totalTax;
+
+    return {
+      subtotal,
+      cgst,
+      sgst,
+      totalTax,
+      totalBeforeFees,
+    };
+  };
+
   const calculatePerDeliveryTotal = () => {
-    return selectedItems.reduce(
-      (total, item) => total + item.product.price * item.quantity,
-      0
-    );
+    if (selectedItems.length === 0) return 0;
+    const taxBreakdown = calculatePerDeliveryTaxBreakdown();
+    return taxBreakdown.totalBeforeFees;
   };
 
   const calculateTotalDeliveries = () => {
@@ -130,10 +161,24 @@ export const CreateSubscriptionScreen = ({ navigation }: any) => {
     }
   };
 
+  // Calculate total tax breakdown for all deliveries
+  const calculateTotalTaxBreakdown = (): TaxBreakdown => {
+    const perDelivery = calculatePerDeliveryTaxBreakdown();
+    const totalDeliveries = calculateTotalDeliveries();
+
+    return {
+      subtotal: perDelivery.subtotal * totalDeliveries,
+      cgst: perDelivery.cgst * totalDeliveries,
+      sgst: perDelivery.sgst * totalDeliveries,
+      totalTax: perDelivery.totalTax * totalDeliveries,
+      totalBeforeFees: perDelivery.totalBeforeFees * totalDeliveries,
+    };
+  };
+
   const calculateTotalAmount = () => {
-    const perDelivery = calculatePerDeliveryTotal();
-    const deliveries = calculateTotalDeliveries();
-    return perDelivery * deliveries;
+    const taxBreakdown = calculateTotalTaxBreakdown();
+    const deliveryFee = 0; // Free for subscriptions
+    return calculateOrderTotal(taxBreakdown, PLATFORM_FEE, deliveryFee);
   };
 
   const onStartDateChange = (event: any, selectedDate?: Date) => {
@@ -164,49 +209,56 @@ export const CreateSubscriptionScreen = ({ navigation }: any) => {
   };
 
   const handleCreateSubscription = () => {
-  if (!user) {
-    Alert.alert('Error', 'Please login to create subscription');
-    return;
-  }
+    if (!user) {
+      Alert.alert('Error', 'Please login to create subscription');
+      return;
+    }
 
-  if (selectedItems.length === 0) {
-    Alert.alert('Error', 'Please select at least one product');
-    return;
-  }
+    if (selectedItems.length === 0) {
+      Alert.alert('Error', 'Please select at least one product');
+      return;
+    }
 
-  const totalDeliveries = calculateTotalDeliveries();
-  const perDeliveryTotal = calculatePerDeliveryTotal();
-  const totalAmount = calculateTotalAmount();
+    const totalDeliveries = calculateTotalDeliveries();
+    const perDeliveryTotal = calculatePerDeliveryTotal();
+    const totalAmount = calculateTotalAmount();
+    const taxBreakdown = calculateTotalTaxBreakdown();
 
-  if (totalDeliveries === 0) {
-    Alert.alert('Error', 'Invalid subscription duration');
-    return;
-  }
+    if (totalDeliveries === 0) {
+      Alert.alert('Error', 'Invalid subscription duration');
+      return;
+    }
 
-  // Prepare items for checkout
-  const checkoutItems = selectedItems.map((item) => ({
-    productId: item.product.id,
-    productName: item.product.name,
-    quantity: item.quantity,
-    price: item.product.price,
-  }));
+    // Prepare items for checkout
+    const checkoutItems = selectedItems.map((item) => ({
+      productId: item.product.id,
+      productName: item.product.name,
+      quantity: item.quantity,
+      price: item.product.price,
+      priceExcludingTax: item.product.priceExcludingTax,
+      taxCGST: item.product.taxCGST,
+      taxSGST: item.product.taxSGST,
+    }));
 
-  // Navigate to subscription checkout
-  navigation.navigate('SubscriptionCheckout', {
-    items: checkoutItems,
-    frequency,
-    startDate,
-    endDate,
-    totalDeliveries,
-    perDeliveryTotal,
-    totalAmount,
-  });
-};
+    // Navigate to subscription checkout
+    navigation.navigate('SubscriptionCheckout', {
+      items: checkoutItems,
+      frequency,
+      startDate,
+      endDate,
+      totalDeliveries,
+      perDeliveryTotal,
+      taxBreakdown,
+      platformFee: PLATFORM_FEE,
+      deliveryFee: 0, // Free for subscriptions
+      totalAmount,
+    });
+  };
 
   const frequencies = [
     { value: SubscriptionFrequency.DAILY, label: 'Daily', icon: '🗓️' },
-    //{ value: SubscriptionFrequency.ALTERNATE_DAYS, label: 'Alternate Days', icon: '📆' },
-    //{ value: SubscriptionFrequency.WEEKLY, label: 'Weekly', icon: '🗓️' },
+    { value: SubscriptionFrequency.ALTERNATE_DAYS, label: 'Alternate Days', icon: '📆' },
+    { value: SubscriptionFrequency.WEEKLY, label: 'Weekly', icon: '🗓️' },
   ];
 
   if (loading) {

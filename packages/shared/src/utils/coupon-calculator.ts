@@ -56,7 +56,7 @@ export const hasApplicableProducts = (
  * Calculate discount for a specific offer
  */
 export const calculateOfferDiscount = (
-  cartItems: CartItem[],
+  cartItems: CartItem[] | any[], // Can be CartItem or SubscriptionItem
   offer: Offer,
   subtotal: number
 ): CouponValidationResult => {
@@ -100,7 +100,9 @@ export const calculateOfferDiscount = (
   if (offer.discountPercentage && offer.discountPercentage > 0) {
     // Filter items by category
     const applicableCartItems = cartItems.filter(item => {
-      if (!item.product) return false;
+      // Handle both CartItem (has product) and SubscriptionItem (product loaded separately)
+      const product = item.product;
+      if (!product) return false;
       
       // If no categories specified, all items are applicable
       if (!offer.applicableCategories || offer.applicableCategories.length === 0) {
@@ -108,7 +110,7 @@ export const calculateOfferDiscount = (
       }
       
       // Check if item category matches
-      return offer.applicableCategories.includes(item.product.category);
+      return offer.applicableCategories.includes(product.category);
     });
     
     // Calculate discount only on applicable items

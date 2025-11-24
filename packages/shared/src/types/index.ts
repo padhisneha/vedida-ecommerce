@@ -105,11 +105,12 @@ export interface Cart {
 export enum PaymentMethod {
   COD = 'cod',
   ONLINE = 'online',
-  UPI = 'upi',
+  UPI = 'upi', // Unified Payments Interface - Manual verification required
 }
 
 export enum PaymentStatus {
   PENDING = 'pending',
+  PENDING_VERIFICATION = 'pending_verification',
   PAID = 'paid',
   FAILED = 'failed',
 }
@@ -154,6 +155,11 @@ export interface Subscription {
   paymentMethod: PaymentMethod;
   paymentStatus?: PaymentStatus;
   transactionId?: string;
+
+  // Coupon fields
+  appliedCoupons?: string[];
+  discountAmount?: number;
+  freeDeliveryApplied?: boolean;
 
   // Delivery Partner fields
   deliveryPartnerId?: string;

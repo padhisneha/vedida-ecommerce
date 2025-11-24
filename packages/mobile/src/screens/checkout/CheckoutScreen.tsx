@@ -1,3 +1,4 @@
+// CheckoutScreen.tsx
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -8,7 +9,9 @@ import {
   Alert,
   ActivityIndicator,
   Modal,
+  Linking,
 } from 'react-native';
+import QRCode from 'react-native-qrcode-svg';
 import RazorpayCheckout from 'react-native-razorpay';
 import {
   useAuthStore,
@@ -21,6 +24,7 @@ import {
   CartItem,
   dateToTimestamp,
   RAZORPAY_CONFIG,
+  UPI_CONFIG,
   PaymentMethod, 
   PaymentStatus,
   UserRole,
@@ -32,6 +36,8 @@ import {
   Offer,
   ProductCategory,
   calculateOfferDiscount,
+  generateUPIString,
+  generateTransactionRef,
 } from '@ecommerce/shared';
 import { showToast } from '../../utils/toast';
 
@@ -42,6 +48,12 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
   const [selectedAddress, setSelectedAddress] = useState<UserAddress | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.COD);
   const [loading, setLoading] = useState(false);
+
+  // UPI QR state
+  const [showUPIModal, setShowUPIModal] = useState(false);
+  const [upiString, setUpiString] = useState('');
+  const [transactionRef, setTransactionRef] = useState('');
+  const [upiPaymentAcknowledged, setUpiPaymentAcknowledged] = useState(false);
   
   // Coupon state
   const [availableCoupons, setAvailableCoupons] = useState<Offer[]>([]);
@@ -234,7 +246,7 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
     });
   };
 
-  const createOrderInDatabase = async () => {
+  const createOrderInDatabase = async (upiTransactionRef?: string) => {
     if (!user || !selectedAddress) {
       throw new Error('User or address not available');
     }
@@ -258,19 +270,27 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
       totalAmount: finalPrices.total,
       deliveryAddress: selectedAddress,
       paymentMethod: paymentMethod,
-      paymentStatus: paymentMethod === PaymentMethod.COD ? PaymentStatus.PENDING : PaymentStatus.PAID,
+      paymentStatus: 
+        paymentMethod === PaymentMethod.COD ? PaymentStatus.PENDING :
+        paymentMethod === PaymentMethod.UPI ? PaymentStatus.PENDING_VERIFICATION :
+        PaymentStatus.PAID,
       status: OrderStatus.PENDING,
       scheduledDeliveryDate: dateToTimestamp(deliveryDate),
       // Coupon data
       appliedCoupons: appliedCoupons.map(c => c.couponCode).filter(Boolean) as string[],
       discountAmount: finalPrices.discount,
       freeDeliveryApplied: finalPrices.freeDeliveryApplied,
+      // UPI transaction reference
+      transactionId: upiTransactionRef,
     };
 
     console.log('=== Order Creation Debug ===');
     console.log('Applied Coupons:', orderData.appliedCoupons);
     console.log('Discount Amount:', orderData.discountAmount);
     console.log('Total Amount:', orderData.totalAmount);
+    if (upiTransactionRef) {
+      console.log('UPI Transaction Ref:', upiTransactionRef);
+    }
     console.log('========================');
 
     try {
@@ -279,12 +299,23 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
       // Notify all admins
       const admins = await getUsersByRole(UserRole.ADMIN);
       const order = await getOrderById(orderId);
+
       for (const admin of admins) {
+        const notificationTitle = 
+          paymentMethod === PaymentMethod.UPI 
+            ? '⏳ UPI Payment Verification Required'
+            : 'New Order Received';
+            
+        const notificationMessage = 
+          paymentMethod === PaymentMethod.UPI
+            ? `Order ${order?.orderNumber} - Customer claims UPI payment of ${formatCurrency(finalPrices.total)}. Please verify.`
+            : `Order ${order?.orderNumber} placed for ${formatCurrency(finalPrices.total)}`;
+        
         await createNotification(
           admin.id,
           NotificationType.ORDER_PLACED,
-          'New Order Received',
-          `Order ${order?.orderNumber} placed for ${formatCurrency(finalPrices.total)}`,
+          notificationTitle,
+          notificationMessage,
           { orderId, metadata: { orderNumber: order?.orderNumber, amount: finalPrices.total } }
         );
       }
@@ -356,11 +387,23 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
       return;
     }
 
+    // Handle UPI QR payment flow
+    if (paymentMethod === PaymentMethod.UPI) {
+      const tempOrderId = `TEMP-${Date.now()}`;
+      const txnRef = generateTransactionRef();
+      const upiStr = generateUPIString(finalPrices.total, tempOrderId, user.name);
+      
+      setTransactionRef(txnRef);
+      setUpiString(upiStr);
+      setShowUPIModal(true);
+      return;
+    }
+
     setLoading(true);
     try {
       let orderId: string;
 
-      if (paymentMethod === 'online') {
+      if (paymentMethod === PaymentMethod.ONLINE) {
         try {
           const paymentResult = await handleRazorpayPayment();
           orderId = await createOrderInDatabase();
@@ -418,6 +461,66 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleUPIPaymentDone = async () => {
+    if (!user) {
+      showToast.error('Please login to place an order');
+      return;
+    }
+
+    if (!selectedAddress) {
+      showToast.error('Please select a delivery address');
+      handleSelectAddress();
+      return;
+    }
+
+    if (!upiPaymentAcknowledged) {
+      showToast.error('Please confirm that you have completed the payment');
+      return;
+    }
+
+    setLoading(true);
+    setShowUPIModal(false);
+
+    try {
+      const orderId = await createOrderInDatabase(transactionRef);
+      await clearCart(user.id);
+
+      const savingsMessage = finalPrices.discount > 0 
+        ? `\n\nYou saved ${formatCurrency(finalPrices.discount)}!`
+        : '';
+
+      Alert.alert(
+        'Order Submitted! ⏳',
+        `Your order has been submitted and is awaiting payment verification.\n\nOrder ID: ${orderId.slice(0, 8)}\nTransaction Ref: ${transactionRef}\n\nYour order will be confirmed once admin verifies the payment.${savingsMessage}`,
+        [
+          {
+            text: 'View Orders',
+            onPress: () => navigation.navigate('ProfileTab', {
+              screen: 'OrderHistory',
+            }),
+          },
+          {
+            text: 'OK',
+            onPress: () => navigation.navigate('HomeTab'),
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('Error creating order:', error);
+      showToast.error('Failed to create order. Please try again.');
+    } finally {
+      setLoading(false);
+      setUpiPaymentAcknowledged(false);
+    }
+  };
+
+  const handleOpenUPIApp = () => {
+    Linking.openURL(upiString).catch(err => {
+      console.error('Error opening UPI app:', err);
+      showToast.error('Unable to open UPI app. Please scan the QR code manually.');
+    });
   };
 
   const getCouponSavingsText = (coupon: Offer) => {
@@ -566,6 +669,7 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>💳 Payment Method</Text>
 
+          {/* Cash on Delivery */}
           <TouchableOpacity
             style={[
               styles.paymentOption,
@@ -587,6 +691,32 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
             <Text style={styles.paymentOptionIcon}>💵</Text>
           </TouchableOpacity>
 
+          {/* UPI QR Payment */}
+          <TouchableOpacity
+            style={[
+              styles.paymentOption,
+              paymentMethod === PaymentMethod.UPI && styles.paymentOptionActive,
+            ]}
+            onPress={() => setPaymentMethod(PaymentMethod.UPI)}
+          >
+            <View style={styles.paymentOptionContent}>
+              <View style={styles.radioButton}>
+                {paymentMethod === PaymentMethod.UPI && <View style={styles.radioButtonInner} />}
+              </View>
+              <View style={styles.paymentOptionDetails}>
+                <Text style={styles.paymentOptionTitle}>UPI Payment</Text>
+                <Text style={styles.paymentOptionSubtitle}>
+                  Pay via GPay, PhonePe, Paytm, etc.
+                </Text>
+                <View style={styles.savingsTagContainer}>
+                  <Text style={styles.savingsTag}>💰 Save 2% (No gateway fees)</Text>
+                </View>
+              </View>
+            </View>
+            <Text style={styles.paymentOptionIcon}>📱</Text>
+          </TouchableOpacity>
+
+          {/* Online Payment (Razorpay) */}
           <TouchableOpacity
             style={[
               styles.paymentOption,
@@ -715,7 +845,7 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
             {finalPrices.discount > 0 && (
               <View style={styles.savingsCard}>
                 <Text style={styles.savingsText}>
-                  🎉 You're saving {formatCurrency(finalPrices.discount)}!
+                  You're saving {formatCurrency(finalPrices.discount)}!
                 </Text>
               </View>
             )}
@@ -747,11 +877,161 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
             <ActivityIndicator color="#fff" />
           ) : (
             <Text style={styles.placeOrderText}>
-              {paymentMethod === 'cod' ? 'Place Order (COD)' : `Pay ${formatCurrency(finalPrices.total)}`}
+              {paymentMethod === PaymentMethod.COD 
+                ? 'Place Order (COD)' 
+                : paymentMethod === PaymentMethod.UPI
+                ? `Pay ${formatCurrency(finalPrices.total)} via UPI`
+                : `Pay ${formatCurrency(finalPrices.total)}`}
             </Text>
           )}
         </TouchableOpacity>
       </View>
+
+      {/* UPI QR Payment Modal */}
+      <Modal
+        visible={showUPIModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => {
+          if (!loading) {
+            setShowUPIModal(false);
+            setUpiPaymentAcknowledged(false);
+          }
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.upiModalContent}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Pay via UPI</Text>
+              {!loading && (
+                <TouchableOpacity onPress={() => {
+                  setShowUPIModal(false);
+                  setUpiPaymentAcknowledged(false);
+                }}>
+                  <Text style={styles.modalClose}>✕</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* UPI Payment Content */}
+            <ScrollView style={styles.upiModalScroll} contentContainerStyle={styles.upiModalScrollContent}>
+              {/* Amount Display */}
+              <View style={styles.upiAmountCard}>
+                <Text style={styles.upiAmountLabel}>Amount to Pay</Text>
+                <Text style={styles.upiAmount}>{formatCurrency(finalPrices.total)}</Text>
+              </View>
+
+              {/* QR Code */}
+              <View style={styles.qrContainer}>
+                <View style={styles.qrCodeWrapper}>
+                  {upiString && (
+                    <QRCode
+                      value={upiString}
+                      size={220}
+                      backgroundColor="white"
+                      color="#1a1a1a"
+                    />
+                  )}
+                </View>
+                <Text style={styles.qrInstructions}>
+                  Scan this QR code with any UPI app
+                </Text>
+              </View>
+
+              {/* UPI Apps */}
+              <View style={styles.upiAppsContainer}>
+                <Text style={styles.upiAppsLabel}>Supported UPI Apps</Text>
+                <View style={styles.upiAppsList}>
+                  {['GPay', 'PhonePe', 'Paytm', 'BHIM', 'Amazon Pay'].map((app) => (
+                    <View key={app} style={styles.upiAppChip}>
+                      <Text style={styles.upiAppText}>{app}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+
+              {/* OR Divider */}
+              <View style={styles.orDivider}>
+                <View style={styles.orLine} />
+                <Text style={styles.orText}>OR</Text>
+                <View style={styles.orLine} />
+              </View>
+
+              {/* Open UPI App Button */}
+              <TouchableOpacity
+                style={styles.openUPIButton}
+                onPress={handleOpenUPIApp}
+              >
+                <Text style={styles.openUPIButtonText}>📱 Open in UPI App</Text>
+              </TouchableOpacity>
+
+              {/* Transaction Reference */}
+              <View style={styles.transactionRefCard}>
+                <Text style={styles.transactionRefLabel}>Transaction Reference</Text>
+                <Text style={styles.transactionRefText}>{transactionRef}</Text>
+                <Text style={styles.transactionRefNote}>
+                  Save this reference for future queries
+                </Text>
+              </View>
+
+              {/* Payment Instructions */}
+              <View style={styles.instructionsCard}>
+                <Text style={styles.instructionsTitle}>Payment Instructions:</Text>
+                <View style={styles.instructionsList}>
+                  <Text style={styles.instructionItem}>1️⃣ Scan QR code or open in UPI app</Text>
+                  <Text style={styles.instructionItem}>2️⃣ Complete payment in your UPI app</Text>
+                  <Text style={styles.instructionItem}>3️⃣ Check the confirmation box below</Text>
+                  <Text style={styles.instructionItem}>4️⃣ Click "Submit Order" button</Text>
+                </View>
+              </View>
+
+              {/* Payment Confirmation Checkbox */}
+              <TouchableOpacity
+                style={styles.confirmationCheckbox}
+                onPress={() => setUpiPaymentAcknowledged(!upiPaymentAcknowledged)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.checkbox}>
+                  {upiPaymentAcknowledged && (
+                    <Text style={styles.checkmark}>✓</Text>
+                  )}
+                </View>
+                <Text style={styles.confirmationText}>
+                  I have completed the UPI payment of {formatCurrency(finalPrices.total)}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Warning Note */}
+              <View style={styles.warningCard}>
+                <Text style={styles.warningText}>
+                  ⚠️ Your order will be confirmed after admin verifies the payment. This usually takes 5-10 minutes during business hours.
+                </Text>
+              </View>
+            </ScrollView>
+
+            {/* Submit Button */}
+            <View style={styles.upiModalFooter}>
+              <TouchableOpacity
+                style={[
+                  styles.submitUPIButton,
+                  (!upiPaymentAcknowledged || loading) && styles.submitUPIButtonDisabled,
+                ]}
+                onPress={handleUPIPaymentDone}
+                disabled={!upiPaymentAcknowledged || loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.submitUPIButtonText}>
+                    ✅ Submit Order
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Coupon Selection Modal */}
       <Modal
@@ -1434,6 +1714,231 @@ const styles = StyleSheet.create({
   },
   savingsSmallText: {
     fontSize: 12,
+    color: '#2E7D32',
+    fontWeight: '600',
+  },
+  upiModalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '90%',
+    paddingBottom: 20,
+  },
+  upiModalScroll: {
+    maxHeight: '80%',
+  },
+  upiModalScrollContent: {
+    padding: 20,
+  },
+  upiAmountCard: {
+    backgroundColor: '#E8F5E9',
+    padding: 20,
+    borderRadius: 16,
+    alignItems: 'center',
+    marginBottom: 24,
+    borderWidth: 2,
+    borderColor: '#4CAF50',
+  },
+  upiAmountLabel: {
+    fontSize: 14,
+    color: '#2E7D32',
+    marginBottom: 8,
+    fontWeight: '600',
+  },
+  upiAmount: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#1B5E20',
+  },
+  qrContainer: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  qrCodeWrapper: {
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    marginBottom: 16,
+  },
+  qrInstructions: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+  },
+  upiAppsContainer: {
+    marginBottom: 24,
+  },
+  upiAppsLabel: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  upiAppsList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  upiAppChip: {
+    backgroundColor: '#f5f5f5',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  upiAppText: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+  },
+  orDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  orLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#e0e0e0',
+  },
+  orText: {
+    paddingHorizontal: 16,
+    fontSize: 13,
+    color: '#999',
+    fontWeight: '600',
+  },
+  openUPIButton: {
+    backgroundColor: '#5f6368',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  openUPIButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  transactionRefCard: {
+    backgroundColor: '#FFF9C4',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#FBC02D',
+  },
+  transactionRefLabel: {
+    fontSize: 12,
+    color: '#F57F17',
+    marginBottom: 6,
+    fontWeight: '600',
+  },
+  transactionRefText: {
+    fontSize: 16,
+    fontFamily: 'monospace',
+    color: '#1a1a1a',
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  transactionRefNote: {
+    fontSize: 11,
+    color: '#F57F17',
+  },
+  instructionsCard: {
+    backgroundColor: '#E3F2FD',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  instructionsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1565C0',
+    marginBottom: 12,
+  },
+  instructionsList: {
+    gap: 8,
+  },
+  instructionItem: {
+    fontSize: 13,
+    color: '#1976D2',
+    lineHeight: 20,
+  },
+  confirmationCheckbox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#f5f5f5',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    gap: 12,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#4CAF50',
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkmark: {
+    fontSize: 18,
+    color: '#4CAF50',
+    fontWeight: 'bold',
+  },
+  confirmationText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#1a1a1a',
+    lineHeight: 20,
+    fontWeight: '500',
+  },
+  warningCard: {
+    backgroundColor: '#FFF3E0',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FFB300',
+  },
+  warningText: {
+    fontSize: 12,
+    color: '#E65100',
+    lineHeight: 18,
+  },
+  upiModalFooter: {
+    padding: 20,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  submitUPIButton: {
+    backgroundColor: '#4CAF50',
+    padding: 18,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  submitUPIButtonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  submitUPIButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  savingsTagContainer: {
+    marginTop: 4,
+  },
+  savingsTag: {
+    fontSize: 11,
     color: '#2E7D32',
     fontWeight: '600',
   },
