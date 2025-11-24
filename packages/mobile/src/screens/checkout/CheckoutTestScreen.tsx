@@ -33,7 +33,6 @@ import {
   ProductCategory,
   calculateOfferDiscount,
 } from '@ecommerce/shared';
-import { showToast } from '../../utils/toast';
 
 export const CheckoutScreen = ({ route, navigation }: any) => {
   const { cartItems, taxBreakdown: initialTaxBreakdown, platformFee, deliveryFee: baseDeliveryFee, total: initialTotal } = route.params;
@@ -98,12 +97,10 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
       
       if (freeDeliveryCoupon) {
         setAppliedCoupons([freeDeliveryCoupon]);
-        showToast.success('Free delivery applied automatically! 🎉');
         console.log('✅ Auto-applied FREEDELIVERY coupon');
       }
     } catch (error) {
       console.error('Error loading coupons:', error);
-      showToast.error('Failed to load coupons');
     } finally {
       setLoadingCoupons(false);
     }
@@ -160,7 +157,7 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
   const handleApplyCoupon = (coupon: Offer) => {
     // Check if coupon is already applied
     if (appliedCoupons.some(c => c.id === coupon.id)) {
-      showToast.error('This coupon is already applied');
+      Alert.alert('Info', 'This coupon is already applied');
       return;
     }
     
@@ -168,7 +165,7 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
     const validation = calculateOfferDiscount(cartItems, coupon, initialTaxBreakdown.subtotal);
     
     if (!validation.isValid) {
-      showToast.error(validation.reason || 'This coupon is not applicable');
+      Alert.alert('Cannot Apply Coupon', validation.reason || 'This coupon is not applicable');
       return;
     }
     
@@ -177,12 +174,18 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
     const isFreeDeliveryCoupon = coupon.couponCode === 'FREEDELIVERY';
     
     if (hasNonFreeDeliveryCoupon && !isFreeDeliveryCoupon) {
-      showToast.error('You can only apply one discount coupon. FREEDELIVERY can be combined.');
+      Alert.alert(
+        'Cannot Apply Multiple Coupons',
+        'You can only apply one discount coupon. FREEDELIVERY can be combined with one other coupon.'
+      );
       return;
     }
     
     if (!isFreeDeliveryCoupon && hasNonFreeDeliveryCoupon) {
-      showToast.error('Remove the existing coupon first to apply this one');
+      Alert.alert(
+        'Cannot Apply Multiple Coupons',
+        'You already have a discount coupon applied. Remove it first to apply this coupon.'
+      );
       return;
     }
     
@@ -190,22 +193,15 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
     setAppliedCoupons([...appliedCoupons, coupon]);
     setShowCouponModal(false);
     
-    const savingsText = `You saved ${formatCurrency(validation.discountAmount)}${validation.freeDeliveryApplied ? ' + Free Delivery' : ''}`;
-    showToast.success(`${coupon.title}\n${savingsText}`);
+    Alert.alert(
+      'Coupon Applied! 🎉',
+      `${coupon.title}\nYou saved ${formatCurrency(validation.discountAmount)}${validation.freeDeliveryApplied ? ' + Free Delivery' : ''}`
+    );
   };
 
   const handleRemoveCoupon = (couponId: string) => {
-    const coupon = appliedCoupons.find(c => c.id === couponId);
     setAppliedCoupons(appliedCoupons.filter(c => c.id !== couponId));
-    
-    if (coupon) {
-      showToast.success(`${coupon.couponCode} removed`);
-    }
   };
-
-  // const handleRemoveCoupon = (couponId: string) => {
-  //   setAppliedCoupons(appliedCoupons.filter(c => c.id !== couponId));
-  // };
 
   const handleSelectAddress = () => {
     if (!user || user.addresses.length === 0) {
@@ -346,12 +342,12 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
 
   const handlePlaceOrder = async () => {
     if (!user) {
-      showToast.error('Please login to place an order');
+      Alert.alert('Error', 'Please login to place an order');
       return;
     }
 
     if (!selectedAddress) {
-      showToast.error('Please select a delivery address');
+      Alert.alert('Error', 'Please select a delivery address');
       handleSelectAddress();
       return;
     }
@@ -383,7 +379,10 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
             ]
           );
         } catch (paymentError: any) {
-          showToast.error(paymentError.message || 'Unable to process payment');
+          Alert.alert(
+            'Payment Failed',
+            paymentError.message || 'Unable to process payment. Please try again.'
+          );
           setLoading(false);
           return;
         }
@@ -414,7 +413,7 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
       }
     } catch (error) {
       console.error('Error placing order:', error);
-      showToast.error('Failed to place order. Please try again.');
+      Alert.alert('Error', 'Failed to place order. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -511,35 +510,41 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
             </View>
           ) : appliedCoupons.length > 0 ? (
             <View style={styles.appliedCouponsContainer}>
-              <View style={styles.appliedCouponsRow}>
-                <View style={styles.appliedCouponsLeft}>
-                  <Text style={styles.appliedCouponsLabel}>
-                    🎟️ Coupons Applied:
-                  </Text>
-                  <View style={styles.couponCodesRow}>
-                    {appliedCoupons.map((coupon, index) => (
-                      <View key={coupon.id} style={styles.couponCodeChip}>
-                        <Text style={styles.couponCodeText}>{coupon.couponCode}</Text>
-                        {coupon.couponCode !== 'FREEDELIVERY' && (
-                          <TouchableOpacity
-                            onPress={() => handleRemoveCoupon(coupon.id)}
-                            style={styles.removeChipButton}
-                          >
-                            <Text style={styles.removeChipText}>✕</Text>
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                    ))}
+              {appliedCoupons.map((coupon) => (
+                <View
+                  key={coupon.id}
+                  style={[styles.appliedCouponCard, { backgroundColor: coupon.backgroundColor }]}
+                >
+                  <View style={styles.appliedCouponContent}>
+                    <Text style={[styles.appliedCouponTitle, { color: coupon.textColor }]}>
+                      ✅ {coupon.title}
+                    </Text>
+                    <Text style={[styles.appliedCouponCode, { color: coupon.textColor }]}>
+                      {coupon.couponCode}
+                    </Text>
+                    <Text style={[styles.appliedCouponSavings, { color: coupon.textColor }]}>
+                      {getCouponSavingsText(coupon)}
+                    </Text>
                   </View>
+                  {coupon.couponCode !== 'FREEDELIVERY' && (
+                    <TouchableOpacity
+                      onPress={() => handleRemoveCoupon(coupon.id)}
+                      style={styles.removeCouponButton}
+                    >
+                      <Text style={styles.removeCouponText}>✕</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
-                <TouchableOpacity onPress={() => setShowCouponModal(true)}>
-                  <Text style={styles.changeText}>Change</Text>
+              ))}
+              {availableCoupons.length > appliedCoupons.length && (
+                <TouchableOpacity
+                  style={styles.browseCouponsButton}
+                  onPress={() => setShowCouponModal(true)}
+                >
+                  <Text style={styles.browseCouponsText}>
+                    + Browse {availableCoupons.length - appliedCoupons.length} more coupon{availableCoupons.length - appliedCoupons.length > 1 ? 's' : ''}
+                  </Text>
                 </TouchableOpacity>
-              </View>
-              {finalPrices.discount > 0 && (
-                <Text style={styles.savingsSmallText}>
-                  💰 Saving {formatCurrency(finalPrices.discount)}
-                </Text>
               )}
             </View>
           ) : availableCoupons.length > 0 ? (
@@ -950,14 +955,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
-  appliedCouponsContainer1: {
+  appliedCouponsContainer: {
     gap: 12,
   },
   appliedCouponCard: {
     borderRadius: 12,
     overflow: 'hidden',
   },
-  couponDashedBorder1: {
+  couponDashedBorder: {
     borderWidth: 1,
     borderStyle: 'dashed',
     borderColor: 'rgba(0,0,0,0.1)',
@@ -1315,7 +1320,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     overflow: 'hidden',
   },
-  couponDashedBorder: {
+  couponDashedBorder1: {
     borderWidth: 1,
     borderStyle: 'dashed',
     borderColor: 'rgba(0,0,0,0.15)',
@@ -1376,66 +1381,6 @@ const styles = StyleSheet.create({
   },
   appliedBadgeText: {
     fontSize: 24,
-  },
-  appliedCouponsContainer: {
-    backgroundColor: '#E8F5E9',
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#4CAF50',
-  },
-  appliedCouponsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 6,
-  },
-  appliedCouponsLeft: {
-    flex: 1,
-  },
-  appliedCouponsLabel: {
-    fontSize: 13,
-    color: '#2E7D32',
-    fontWeight: '600',
-    marginBottom: 6,
-  },
-  couponCodesRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  couponCodeChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#4CAF50',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-    gap: 6,
-  },
-  couponCodeText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
-    fontFamily: 'monospace',
-  },
-  removeChipButton: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  removeChipText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  savingsSmallText: {
-    fontSize: 12,
-    color: '#2E7D32',
-    fontWeight: '600',
   },
   // ... rest of existing styles from original file ...
 });

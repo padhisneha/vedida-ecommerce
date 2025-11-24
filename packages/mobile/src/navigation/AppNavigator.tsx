@@ -340,6 +340,17 @@ const TabNavigator = () => {
           tabBarLabel: 'Profile',
           tabBarIcon: ({ color }) => <TabIcon icon="👤" color={color} />,
         }}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            // Prevent default behavior
+            e.preventDefault();
+
+            // Always reset to ProfileMain
+            navigation.navigate('ProfileTab', {
+              screen: 'ProfileMain'
+            });
+          },
+        })}
       />
     </Tab.Navigator>
   );

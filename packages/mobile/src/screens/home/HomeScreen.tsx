@@ -148,9 +148,20 @@ export const HomeScreen = ({ navigation }: any) => {
       <View style={styles.header}>
         {/* Header Top Row - Title and Bell */}
         <View style={styles.headerTop}>
-          <View style={styles.headerLeft}>
+          {/* <View style={styles.headerLeft}>
             <Text style={styles.headerTitle}>Vedida Farms</Text>
             <Text style={styles.headerSubtitle}>Fresh to your doorstep</Text>
+          </View> */}
+          <View style={styles.logoRow}>
+            <Image 
+              source={require('../../../assets/logo.png')} // Adjust path to your logo
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
+            <View style={styles.headerTextContainer}>
+              <Text style={styles.headerTitle}>Vedida Farms</Text>
+              <Text style={styles.headerSubtitle}>Fresh to your doorstep</Text>
+            </View>
           </View>
 
           {/* Notification Bell */}
@@ -280,7 +291,7 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#fff',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingTop: 60,
     paddingBottom: 16,
     borderBottomWidth: 1,
@@ -291,6 +302,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 16,
+    paddingRight: 50,
   },
   headerLeft: {
     flex: 1,
@@ -494,5 +506,17 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',
+  },
+  logoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  logoImage: {
+    width: 60,
+    height: 60,
+  },
+  headerTextContainer: {
+    flex: 1,
   },
 });

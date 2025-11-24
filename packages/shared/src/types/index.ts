@@ -200,6 +200,11 @@ export interface Order {
   scheduledDeliveryDate: Timestamp;
   deliveredAt?: Timestamp;
 
+  // Coupon/Discount fields
+  appliedCoupons?: string[]; // Array of coupon codes applied
+  discountAmount?: number;   // Total discount given
+  freeDeliveryApplied?: boolean;
+
   // Payment fields
   paymentMethod: PaymentMethod;
   paymentStatus?: PaymentStatus;

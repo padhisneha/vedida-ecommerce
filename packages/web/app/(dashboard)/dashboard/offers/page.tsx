@@ -9,8 +9,10 @@ import {
   toggleOfferStatus,
   Offer,
   formatDate,
+  ProductCategory
 } from '@ecommerce/shared';
 import { showToast } from '@/lib/toast';
+import { off } from 'process';
 
 export default function OffersManagementPage() {
   const [offers, setOffers] = useState<Offer[]>([]);
@@ -33,6 +35,8 @@ export default function OffersManagementPage() {
     displayOrder: 1,
     minOrderAmount: '',
     maxDiscount: '',
+    applicableCategories: [] as ProductCategory[],
+    includesFreeDelivery: false,
   });
 
   useEffect(() => {
@@ -67,6 +71,8 @@ export default function OffersManagementPage() {
       displayOrder: 1,
       minOrderAmount: '',
       maxDiscount: '',
+      applicableCategories: [],
+      includesFreeDelivery: false,
     });
     setEditingOffer(null);
     setShowForm(false);
@@ -88,6 +94,8 @@ export default function OffersManagementPage() {
       displayOrder: offer.displayOrder,
       minOrderAmount: offer.minOrderAmount?.toString() || '',
       maxDiscount: offer.maxDiscount?.toString() || '',
+      applicableCategories: offer.applicableCategories || [],
+      includesFreeDelivery: offer.includesFreeDelivery || false,
     });
     setShowForm(true);
   };
@@ -112,6 +120,8 @@ export default function OffersManagementPage() {
         isActive: formData.isActive,
         showOnHomepage: formData.showOnHomepage,
         displayOrder: formData.displayOrder,
+        applicableCategories: formData.applicableCategories,
+        includesFreeDelivery: formData.includesFreeDelivery,
       };
 
       if (formData.discountPercentage) {
@@ -184,6 +194,20 @@ export default function OffersManagementPage() {
     { bg: '#FED7AA', text: '#9A3412', name: 'Orange' },
   ];
 
+  const getProductEmoji = (category: string) => {
+    const emojis: Record<string, string> = {
+        milk: '🥛',
+        ghee: '🧈',
+        paneer: '🧀',
+        curd: '🥣',
+        butter: '🧈',
+        cheese: '🧀',
+    };
+    
+    const key = category.toLowerCase();
+    return emojis[key] || '📦';
+  };
+
   if (loading) {
     return (
       <div className="p-8">
@@ -235,6 +259,25 @@ export default function OffersManagementPage() {
                 </div>
               )}
             </div>
+
+            {offer.applicableCategories && offer.applicableCategories.length > 0 && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-600">Applicable To:</span>
+                <span className="font-medium">
+                  {offer.applicableCategories.map(cat => getProductEmoji(cat)).join(' ')}
+                  {' '}
+                  {offer.applicableCategories.join(', ')}
+                </span>
+              </div>
+            )}
+            
+            {offer.includesFreeDelivery && (
+              <div className="flex items-center gap-2 text-sm">
+                <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-semibold">
+                  🚚 Free Delivery Included
+                </span>
+              </div>
+            )}
 
             {/* Details */}
             <div className="space-y-2 mb-4">
@@ -368,6 +411,62 @@ export default function OffersManagementPage() {
                   />
                 </div>
               </div>
+
+              {/* Applicable Categories */}
+<div>
+  <label className="label">Applicable Categories (leave empty for all products)</label>
+  <div className="space-y-2">
+    {Object.values(ProductCategory).map((category) => (
+      <label key={category} className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={formData.applicableCategories?.includes(category) || false}
+          onChange={(e) => {
+            const current = formData.applicableCategories || [];
+            if (e.target.checked) {
+              setFormData({
+                ...formData,
+                applicableCategories: [...current, category],
+              });
+            } else {
+              setFormData({
+                ...formData,
+                applicableCategories: current.filter(c => c !== category),
+              });
+            }
+          }}
+          className="w-4 h-4 text-green-600 rounded"
+        />
+        <span className="text-sm text-gray-700 capitalize">
+          {getProductEmoji(category)} {category}
+        </span>
+      </label>
+    ))}
+  </div>
+  <p className="text-xs text-gray-500 mt-2">
+    If no categories selected, offer applies to all products
+  </p>
+</div>
+
+{/* Free Delivery Option */}
+<div className="pt-4 border-t border-gray-200">
+  <label className="flex items-center gap-3 cursor-pointer">
+    <input
+      type="checkbox"
+      checked={formData.includesFreeDelivery}
+      onChange={(e) => setFormData({ ...formData, includesFreeDelivery: e.target.checked })}
+      className="w-4 h-4 text-green-600 rounded"
+    />
+    <div>
+      <span className="text-sm font-medium text-gray-700">
+        Includes Free Delivery
+      </span>
+      <p className="text-xs text-gray-500">
+        This offer also provides free delivery to the customer
+      </p>
+    </div>
+  </label>
+</div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>

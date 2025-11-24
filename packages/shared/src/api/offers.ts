@@ -12,7 +12,7 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { getFirebaseFirestore } from './firebase-config';
-import { Offer } from '../types';
+import { Offer, CartItem } from '../types';
 
 const COLLECTIONS = {
   OFFERS: 'offers',
@@ -130,5 +130,53 @@ export const toggleOfferStatus = async (offerId: string, isActive: boolean): Pro
   await updateDoc(doc(db, COLLECTIONS.OFFERS, offerId), {
     isActive,
     updatedAt: getCurrentTimestamp(),
+  });
+};
+
+/**
+ * Get applicable coupons for cart
+ */
+export const getApplicableCoupons = async (
+  cartItems: CartItem[],
+  subtotal: number
+): Promise<Offer[]> => {
+  const db = getFirebaseFirestore();
+  const now = Timestamp.now();
+
+  // Get all active offers with coupon codes
+  const q = query(
+    collection(db, COLLECTIONS.OFFERS),
+    where('isActive', '==', true),
+    where('couponCode', '!=', null),
+    orderBy('couponCode'),
+    orderBy('displayOrder', 'asc')
+  );
+
+  const snapshot = await getDocs(q);
+  const offers = snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data(),
+  })) as Offer[];
+
+  // Filter by date range and applicability
+  return offers.filter(offer => {
+    // Check date validity
+    const start = offer.startDate.toDate();
+    const end = offer.endDate.toDate();
+    const current = now.toDate();
+    if (current < start || current > end) return false;
+    
+    // Check minimum order amount
+    if (offer.minOrderAmount && subtotal < offer.minOrderAmount) return false;
+    
+    // Check if cart has applicable products
+    if (offer.applicableCategories && offer.applicableCategories.length > 0) {
+      const hasApplicable = cartItems.some(item =>
+        item.product && offer.applicableCategories!.includes(item.product.category)
+      );
+      if (!hasApplicable) return false;
+    }
+    
+    return true;
   });
 };

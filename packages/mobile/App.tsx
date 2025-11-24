@@ -7,6 +7,7 @@ import { useAuthStore } from '@ecommerce/shared';
 import { getFirebaseAuth } from '@ecommerce/shared';
 import { onAuthStateChanged } from 'firebase/auth';
 import { getUserById } from '@ecommerce/shared';
+import Toast from 'react-native-toast-message';
 
 export default function App() {
   const { setUser, setLoading, user } = useAuthStore();
@@ -69,6 +70,7 @@ export default function App() {
     <SafeAreaProvider>
       <StatusBar style="auto" />
       <AppNavigator />
+      <Toast />
     </SafeAreaProvider>
   );
 }

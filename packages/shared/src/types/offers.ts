@@ -1,4 +1,5 @@
 import { Timestamp } from 'firebase/firestore';
+import { ProductCategory } from './index';
 
 export interface Offer {
   id: string;
@@ -16,9 +17,12 @@ export interface Offer {
   isActive: boolean;
   
   // Target
-  applicableProducts?: string[]; // Product IDs
+  applicableCategories?: ProductCategory[]; // Product IDs
   minOrderAmount?: number;
   maxDiscount?: number;
+
+  // Special features
+  includesFreeDelivery?: boolean; // Can be combined with discount
   
   // Display
   displayOrder: number; // For carousel ordering

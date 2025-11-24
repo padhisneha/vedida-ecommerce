@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -40,6 +41,16 @@ export const NotificationsScreen = ({ navigation }: any) => {
       setLoading(false);
     }
   }, [user, activeFilter]);
+
+  // Refresh when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (user && !loading) {
+        // Silently refresh without showing loading state
+        loadNotifications();
+      }
+    }, [user, loading])
+  );
 
   const loadNotifications = async () => {
     if (!user) return;
@@ -114,7 +125,24 @@ export const NotificationsScreen = ({ navigation }: any) => {
   const handleNotificationPress = async (notification: Notification) => {
     // Mark as read if unread
     if (!notification.isRead) {
-      await handleMarkAsRead(notification.id);
+      //await handleMarkAsRead(notification.id);
+    }
+
+    // Optimistic update - mark as read immediately in UI
+    if (!notification.isRead) {
+      setNotifications(prev => 
+        prev.map(n => 
+          n.id === notification.id 
+            ? { ...n, isRead: true } 
+            : n
+        )
+      );
+      setUnreadCount(prev => Math.max(0, prev - 1));
+      
+      // Mark as read in database (background)
+      markAsRead(notification.id).catch(error => {
+        console.error('Error marking as read:', error);
+      });
     }
 
     // Navigate to relevant screen
