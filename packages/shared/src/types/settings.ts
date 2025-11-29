@@ -1,10 +1,3 @@
-export interface DeliveryArea {
-  id: string;
-  name: string;
-  pincode: string;
-  active: boolean;
-}
-
 export interface AppSettings {
   id: string; // Will be 'app_settings' (single doc)
   
@@ -15,7 +8,6 @@ export interface AppSettings {
   
   // Delivery Settings
   maxDeliveryDistance: number; // in km
-  deliveryAreas: DeliveryArea[];
   
   // Support Contact
   supportEmail: string;
@@ -30,7 +22,6 @@ export const DEFAULT_SETTINGS: Omit<AppSettings, 'id' | 'updatedAt'> = {
   deliveryFee: 0,
   minimumOrderAmount: 0,
   maxDeliveryDistance: 10,
-  deliveryAreas: [],
   supportEmail: 'support@dairyfresh.com',
   supportPhone: '+919876543210',
   supportWhatsApp: '919876543210',

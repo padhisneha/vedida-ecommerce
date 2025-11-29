@@ -1,3 +1,4 @@
+// packages/web/components/invoice/InvoicePDF.tsx
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
 import { Order, Subscription } from '@ecommerce/shared';

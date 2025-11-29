@@ -45,7 +45,13 @@ export default function Sidebar() {
           <div className="flex-1 overflow-y-auto">
             <nav className="px-3 py-4 space-y-1">
               {navigation.map((item) => {
-                const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
+                const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname?.startsWith(item.href + '/'));
+
+                // if(isActive)
+                // {
+                //   console.log('Current pathname:', pathname);
+                //   console.log('Checking item:', item.href, 'isActive:', isActive);
+                // }
                 
                 return (
                   <Link

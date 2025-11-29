@@ -1,3 +1,4 @@
+// packages/web/app/(dashboard)/dashboard/subscriptions/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -9,6 +10,11 @@ import {
   SubscriptionFrequency,
   formatCurrency,
   formatDate,
+  DeliveryArea,
+  getAllDeliveryAreas,
+  User,
+  UserRole,
+  getUsersByRole,
 } from '@ecommerce/shared';
 import { showToast } from '@/lib/toast';
 
@@ -19,11 +25,19 @@ export default function SubscriptionsPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('new');
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterSlot, setFilterSlot] = useState<string>('all'); // 'all' | 'morning' | 'evening'
+  const [filterArea, setFilterArea] = useState<string>('all'); // 'all' | area name
+  const [filterPartner, setFilterPartner] = useState<string>('all'); // 'all' | 'unassigned' | partnerId
+  const [deliveryPartners, setDeliveryPartners] = useState<User[]>([]);
+  const [deliveryAreas, setDeliveryAreas] = useState<DeliveryArea[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
+
   const itemsPerPage = 10;
 
   useEffect(() => {
     loadSubscriptions();
+    loadDeliveryAreas();
+    loadDeliveryPartners();
   }, []);
 
   const loadSubscriptions = async () => {
@@ -36,6 +50,25 @@ export default function SubscriptionsPage() {
       showToast.error('Failed to load subscriptions');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadDeliveryAreas = async () => {
+    try {
+      const areas = await getAllDeliveryAreas();
+      setDeliveryAreas(areas);
+    } catch (error) {
+      console.error('Error loading delivery areas:', error);
+    }
+  };
+
+  const loadDeliveryPartners = async () => {
+    try {
+      const partners = await getUsersByRole(UserRole.DELIVERY_PARTNER);
+      const activePartners = partners.filter(p => p.isActive !== false);
+      setDeliveryPartners(activePartners);
+    } catch (error) {
+      console.error('Error loading delivery partners:', error);
     }
   };
 
@@ -73,6 +106,26 @@ export default function SubscriptionsPage() {
             (sub.status === SubscriptionStatus.COMPLETED || sub.status === SubscriptionStatus.CANCELLED) &&
             !isSubscriptionOlderThan7Days(sub)
         );
+    }
+
+    if (filterPartner !== 'all') {
+      if (filterPartner === 'unassigned') {
+        filtered = filtered.filter((sub) => !sub.deliveryPartnerId);
+      } else {
+        filtered = filtered.filter((sub) => sub.deliveryPartnerId === filterPartner);
+      }
+    }
+
+    // Filter by delivery slot
+    if (filterSlot !== 'all') {
+      filtered = filtered.filter((sub) => sub.deliverySlot === filterSlot);
+    }
+
+    // Filter by delivery area
+    if (filterArea !== 'all') {
+      filtered = filtered.filter(
+        (sub) => sub.deliveryAddress.location === filterArea
+      );
     }
 
     // Filter by search query
@@ -192,7 +245,7 @@ export default function SubscriptionsPage() {
       </div>
 
       {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-green-50 border border-green-200 rounded-lg p-4">
           <div className="flex items-center justify-between">
             <div>
@@ -228,7 +281,7 @@ export default function SubscriptionsPage() {
             <div className="text-3xl">📋</div>
           </div>
         </div>
-      </div>
+      </div> */}
 
       {/* Search Bar */}
       <div className="mb-6">
@@ -252,6 +305,80 @@ export default function SubscriptionsPage() {
             </button>
           )}
         </div>
+      </div>
+
+      {/* Filters Row */}
+      <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        {/* Delivery Partner Filter - NEW */}
+        <div className="flex flex-col gap-2">
+          <label className="text-sm font-medium text-gray-700">
+            👤 Delivery Partner
+          </label>
+          <select
+            className="input py-2 px-3 text-sm"
+            value={filterPartner}
+            onChange={(e) => setFilterPartner(e.target.value)}
+          >
+            <option value="all">All Partners</option>
+            <option value="unassigned">Unassigned</option>
+            {deliveryPartners.map((partner) => (
+              <option key={partner.id} value={partner.id}>
+                {partner.name || partner.phoneNumber}
+              </option>
+            ))}
+          </select>
+        </div>
+        
+        {/* Delivery Slot Filter - Existing */}
+        <div className="flex flex-col gap-2">
+          <label className="text-sm font-medium text-gray-700">
+            🕐 Delivery Slot
+          </label>
+          <select
+            className="input py-2 px-3 text-sm"
+            value={filterSlot}
+            onChange={(e) => setFilterSlot(e.target.value)}
+          >
+            <option value="all">All Slots</option>
+            <option value="morning">🌅 Morning (6 AM - 12 PM)</option>
+            <option value="evening">🌆 Evening (4 PM - 8 PM)</option>
+          </select>
+        </div>
+
+        {/* Delivery Area Filter - Existing */}
+        <div className="flex flex-col gap-2">
+          <label className="text-sm font-medium text-gray-700">
+            📍 Delivery Area
+          </label>
+          <select
+            className="input py-2 px-3 text-sm"
+            value={filterArea}
+            onChange={(e) => setFilterArea(e.target.value)}
+          >
+            <option value="all">All Areas</option>
+            {deliveryAreas.map((area) => (
+              <option key={area.id} value={area.name}>
+                {area.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Clear Filters Button */}
+        {(filterPartner !== 'all' || filterSlot !== 'all' || filterArea !== 'all') && (
+          <div className="mb-6">
+          <button
+            onClick={() => {
+              setFilterPartner('all');
+              setFilterSlot('all');
+              setFilterArea('all');
+            }}
+            className="btn-secondary text-sm py-2"
+          >
+            ✕ Clear Filters
+          </button>
+          </div>
+        )}
       </div>
 
       {/* Tabs */}
@@ -435,10 +562,31 @@ export default function SubscriptionsPage() {
             </div>
           </div>
 
-          {/* Results count */}
-          {searchQuery && (
+          {/* Results count with active filters */}
+          {(searchQuery || filterPartner !== 'all' || filterSlot !== 'all' || filterArea !== 'all') && (
             <div className="mt-4 text-sm text-gray-600">
-              Found {filteredCount} result{filteredCount !== 1 ? 's' : ''} for "{searchQuery}"
+              Found {filteredCount} result{filteredCount !== 1 ? 's' : ''}
+              {searchQuery && ` for "${searchQuery}"`}
+              {filterPartner !== 'all' && (
+                <span className="ml-1">
+                  • Partner: <span className="font-medium">
+                    {filterPartner === 'unassigned' ? 'Unassigned' :
+                    deliveryPartners.find(p => p.id === filterPartner)?.name || 'Selected Partner'}
+                  </span>
+                </span>
+              )}
+              {filterSlot !== 'all' && (
+                <span className="ml-1">
+                  • Slot: <span className="font-medium">
+                    {filterSlot === 'morning' ? 'Morning' : 'Evening'}
+                  </span>
+                </span>
+              )}
+              {filterArea !== 'all' && (
+                <span className="ml-1">
+                  • Area: <span className="font-medium">{filterArea}</span>
+                </span>
+              )}
             </div>
           )}
 

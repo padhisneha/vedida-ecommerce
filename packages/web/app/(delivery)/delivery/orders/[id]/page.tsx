@@ -94,8 +94,6 @@ export default function DeliveryOrderDetailPage({ params }: { params: { id: stri
     try {
       await updateOrderStatus(order.id, newStatus);
 
-      alert(newStatus);
-
       // Notify customer
       if (newStatus === OrderStatus.CONFIRMED) {
         await createNotification(
@@ -132,10 +130,7 @@ export default function DeliveryOrderDetailPage({ params }: { params: { id: stri
 
         // Notify admin
         const admins = await getUsersByRole(UserRole.ADMIN);
-        alert(admins.length);
         for (const admin of admins) {
-          alert("hello");
-          alert(admin.id);
           await createNotification(
             admin.id,
             NotificationType.ORDER_DELIVERED,
@@ -413,7 +408,7 @@ export default function DeliveryOrderDetailPage({ params }: { params: { id: stri
                     </div>
                     <div>
                       <p className="font-medium text-gray-900 text-lg">
-                        {item.product?.name || 'Product'}
+                        {item.product?.name || 'Product'} ({item.product?.quantity} {item.product?.unit})
                       </p>
                       <p className="text-sm text-gray-600">
                         Quantity: {item.quantity}
@@ -430,6 +425,30 @@ export default function DeliveryOrderDetailPage({ params }: { params: { id: stri
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* Delivery Slot */}
+          <div className="card">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-gray-900">
+                🕐 Delivery Slot
+              </h2>
+            </div>
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-lg border-2 border-green-200">
+              <div className="flex items-center gap-3">
+                <span className="text-4xl">
+                  {order.deliverySlot === 'morning' ? '🌅' : '🌆'}
+                </span>
+                <div>
+                  <p className="font-semibold text-gray-900 text-lg">
+                    {order.deliverySlotLabel || 'Not specified'}
+                  </p>
+                  <p className="text-sm text-gray-600 mt-1">
+                    All deliveries arrive during this time
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
 

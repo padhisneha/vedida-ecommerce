@@ -1,3 +1,4 @@
+// packages/web/app/(dashboard)/dashboard/orders/[id]/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -27,6 +28,7 @@ import {
   verifyUPIPayment,
   UPI_CONFIG,
   PaymentStatus,
+  updateOrderDeliverySlot,
 } from '@ecommerce/shared';
 import { showToast } from '@/lib/toast';
 import { generateOrderInvoicePDF } from '@/lib/invoice-generator';
@@ -55,6 +57,10 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
   const [paymentMethodValue, setPaymentMethodValue] = useState<'cod' | 'online' | 'upi'>('cod');
   const [paymentStatusValue, setPaymentStatusValue] = useState<'pending' | 'paid' | 'failed'>('pending');
   const [savingPayment, setSavingPayment] = useState(false);
+
+  const [editingSlot, setEditingSlot] = useState(false);
+  const [slotValue, setSlotValue] = useState<'morning' | 'evening' | 'flexible'>('flexible');
+  const [savingSlot, setSavingSlot] = useState(false);
 
   useEffect(() => {
     loadOrder();
@@ -207,6 +213,31 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
       showToast.error('Failed to assign delivery partner');
     } finally {
       setAssigning(false);
+    }
+  };
+
+  const handleSaveSlot = async () => {
+    if (!order) return;
+
+    if (!confirm('Update delivery slot?')) {
+      return;
+    }
+
+    setSavingSlot(true);
+    const toastId = showToast.loading('Updating delivery slot...');
+
+    try {
+      await updateOrderDeliverySlot(order.id, slotValue);
+      showToast.dismiss(toastId);
+      showToast.success('Delivery slot updated successfully!');
+      setEditingSlot(false);
+      await loadOrder();
+    } catch (error) {
+      console.error('Error updating delivery slot:', error);
+      showToast.dismiss(toastId);
+      showToast.error('Failed to update delivery slot');
+    } finally {
+      setSavingSlot(false);
     }
   };
 
@@ -573,7 +604,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                     </div>
                     <div>
                       <p className="font-medium text-gray-900 text-lg">
-                        {item.product?.name || 'Product'}
+                        {item.product?.name || 'Product'} ({item.product?.quantity} {item.product?.unit})
                       </p>
                       <p className="text-sm text-gray-600">
                         Quantity: {item.quantity}
@@ -740,6 +771,75 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
               🚚 Delivery Information
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+              {/* Editable Delivery Slot */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm text-gray-600">Delivery Slot</p>
+                  {!editingSlot && order.status !== OrderStatus.DELIVERED && order.status !== OrderStatus.CANCELLED && (
+                    <button
+                      onClick={() => {
+                        setEditingSlot(true);
+                        setSlotValue(order.deliverySlot || 'flexible');
+                      }}
+                      className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+                    >
+                      🕐 Change
+                    </button>
+                  )}
+                </div>
+                
+                {editingSlot ? (
+                  <div>
+                    <select
+                      className="input text-sm mb-2"
+                      value={slotValue}
+                      onChange={(e) => setSlotValue(e.target.value as 'morning' | 'evening' | 'flexible')}
+                      disabled={savingSlot}
+                    >
+                      <option value="morning">🌅 Morning (6 AM - 12 PM)</option>
+                      <option value="evening">🌆 Evening (4 PM - 8 PM)</option>
+                      <option value="flexible">🕐 Flexible (Any Time)</option>
+                    </select>
+                    
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleSaveSlot}
+                        disabled={savingSlot}
+                        className="text-xs px-3 py-1 bg-primary-500 text-white rounded hover:bg-primary-600 disabled:opacity-50"
+                      >
+                        {savingSlot ? 'Saving...' : 'Save'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditingSlot(false);
+                          setSlotValue(order.deliverySlot || 'flexible');
+                        }}
+                        disabled={savingSlot}
+                        className="text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="font-semibold text-gray-900 flex items-center gap-2">
+                      <span className="text-xl">
+                        {order.deliverySlot === 'morning' ? '🌅' : 
+                        order.deliverySlot === 'evening' ? '🌆' : '🕐'}
+                      </span>
+                      <span>{order.deliverySlotLabel || 'Flexible Delivery'}</span>
+                    </p>
+                    {order.deliverySlot === 'flexible' && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Team will coordinate delivery time
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
               {/* Editable Scheduled Delivery Date */}
               <div className="bg-gray-50 p-4 rounded-lg">
                 <div className="flex items-center justify-between mb-2">

@@ -1,3 +1,4 @@
+// packages/mobile/src/screens/orders/OrderDetailScreen.tsx
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -334,6 +335,29 @@ export const OrderDetailScreen = ({ route, navigation }: any) => {
             )}
           </View>
         </View>
+
+        {/* Delivery Slot */}
+        {order.deliverySlot && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>🕐 Delivery Slot</Text>
+            <View style={styles.deliverySlotCard}>
+              <Text style={styles.deliverySlotIcon}>
+                {order.deliverySlot === 'morning' ? '🌅' : 
+                order.deliverySlot === 'evening' ? '🌆' : '🕐'}
+              </Text>
+              <View style={styles.deliverySlotContent}>
+                <Text style={styles.deliverySlotLabel}>
+                  {order.deliverySlotLabel || 'Delivery Slot'}
+                </Text>
+                {order.deliverySlot === 'flexible' && (
+                  <Text style={styles.deliverySlotNote}>
+                    Our team will coordinate the delivery time with you
+                  </Text>
+                )}
+              </View>
+            </View>
+          </View>
+        )}
 
         {/* Payment Summary */}
         <View style={styles.section}>
@@ -740,5 +764,32 @@ const styles = StyleSheet.create({
     fontFamily: 'monospace',
     color: '#1a1a1a',
     fontWeight: '600',
+  },
+  deliverySlotCard: {
+    backgroundColor: '#E8F5E9',
+    padding: 16,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+  },
+  deliverySlotIcon: {
+    fontSize: 32,
+    marginRight: 12,
+  },
+  deliverySlotContent: {
+    flex: 1,
+  },
+  deliverySlotLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2E7D32',
+    marginBottom: 4,
+  },
+  deliverySlotNote: {
+    fontSize: 12,
+    color: '#4CAF50',
+    lineHeight: 16,
   },
 });

@@ -1,6 +1,6 @@
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { getFirebaseFirestore } from './firebase-config';
-import { AppSettings, DEFAULT_SETTINGS, DeliveryArea } from '../types/settings';
+import { AppSettings, DEFAULT_SETTINGS } from '../types/settings';
 import { getCurrentTimestamp } from '../utils';
 
 const SETTINGS_DOC_ID = 'app_settings';
@@ -42,44 +42,4 @@ export const updateAppSettings = async (
     ...updates,
     updatedAt: getCurrentTimestamp(),
   });
-};
-
-/**
- * Add delivery area
- */
-export const addDeliveryArea = async (
-  area: Omit<DeliveryArea, 'id'>
-): Promise<void> => {
-  const settings = await getAppSettings();
-  
-  const newArea: DeliveryArea = {
-    ...area,
-    id: `area_${Date.now()}`,
-  };
-
-  const updatedAreas = [...settings.deliveryAreas, newArea];
-  
-  await updateAppSettings({ deliveryAreas: updatedAreas });
-};
-
-/**
- * Remove delivery area
- */
-export const removeDeliveryArea = async (areaId: string): Promise<void> => {
-  const settings = await getAppSettings();
-  const updatedAreas = settings.deliveryAreas.filter((area) => area.id !== areaId);
-  
-  await updateAppSettings({ deliveryAreas: updatedAreas });
-};
-
-/**
- * Toggle delivery area status
- */
-export const toggleDeliveryArea = async (areaId: string): Promise<void> => {
-  const settings = await getAppSettings();
-  const updatedAreas = settings.deliveryAreas.map((area) =>
-    area.id === areaId ? { ...area, active: !area.active } : area
-  );
-  
-  await updateAppSettings({ deliveryAreas: updatedAreas });
 };

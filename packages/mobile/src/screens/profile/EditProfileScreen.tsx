@@ -32,6 +32,11 @@ export const EditProfileScreen = ({ navigation }: any) => {
       return;
     }
 
+    if (!email.trim()) {
+      Alert.alert('Error', 'Please enter your email address');
+      return;
+    }
+
     if (email && !email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
       Alert.alert('Error', 'Please enter a valid email address');
       return;
@@ -41,14 +46,14 @@ export const EditProfileScreen = ({ navigation }: any) => {
     try {
       await updateUserProfile(user.id, {
         name: name.trim(),
-        email: email.trim() || undefined,
+        email: email.trim(),
       });
 
       // Update local state
       setUser({
         ...user,
         name: name.trim(),
-        email: email.trim() || user.email,
+        email: email.trim(),
       });
 
       Alert.alert('Success', 'Profile updated successfully', [
@@ -114,7 +119,7 @@ export const EditProfileScreen = ({ navigation }: any) => {
 
           {/* Email */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Email (Optional)</Text>
+            <Text style={styles.label}>Email *</Text>
             <TextInput
               style={styles.input}
               placeholder="Enter your email address"

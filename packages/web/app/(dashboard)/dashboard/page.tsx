@@ -94,7 +94,7 @@ export default function DashboardPage() {
 
   const getTodayDeliverySummary = () => {
     const todayOrders = getTodayOrders();
-    const productMap = new Map<string, { name: string; quantity: number; unit: string }>();
+    const productMap = new Map<string, { name: string; productQuantity: Number, ProductUnit: string, quantity: number; }>();
 
     todayOrders.forEach((order) => {
       order.items.forEach((item) => {
@@ -104,14 +104,16 @@ export default function DashboardPage() {
         if (product) {
           const existing = productMap.get(productKey) || { 
             name: product.name, 
-            quantity: 0,
-            unit: product.unit 
+            productQuantity: product.quantity,
+            ProductUnit: product.unit,
+            quantity: 0
           };
           
           productMap.set(productKey, {
             name: product.name,
-            quantity: existing.quantity + item.quantity,
-            unit: product.unit,
+            productQuantity: product.quantity,
+            ProductUnit: product.unit,
+            quantity: existing.quantity + item.quantity
           });
         }
       });
@@ -317,7 +319,7 @@ export default function DashboardPage() {
                   <span className="font-medium text-gray-900">{item.name}</span>
                 </div>
                 <span className="text-lg font-bold text-primary-600">
-                  {item.quantity} {item.unit}
+                  {item.quantity} x {item.productQuantity} {item.ProductUnit}
                 </span>
               </div>
             ))}

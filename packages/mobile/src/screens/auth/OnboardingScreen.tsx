@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+// OnboardingScreen.tsx
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,13 +11,18 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Modal,
 } from 'react-native';
 import {
   useAuthStore,
   updateUserProfile,
   addUserAddress,
   getUserById,
+  getActiveDeliveryAreas,
+  DeliveryArea,
+  DELIVERY_SLOT_ICONS,
 } from '@ecommerce/shared';
+import { showToast } from '../../utils/toast';
 
 export const OnboardingScreen = ({ navigation }: any) => {
   const { user, setUser } = useAuthStore();
@@ -28,19 +34,65 @@ export const OnboardingScreen = ({ navigation }: any) => {
   const [addressLabel, setAddressLabel] = useState('');
   const [apartment, setApartment] = useState('');
   const [street, setStreet] = useState('');
+  const [selectedLocation, setSelectedLocation] = useState('');
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
   const [pincode, setPincode] = useState('');
   const [landmark, setLandmark] = useState('');
   
+  // Delivery areas
+  const [deliveryAreas, setDeliveryAreas] = useState<DeliveryArea[]>([]);
+  const [loadingAreas, setLoadingAreas] = useState(false);
+  const [showAreaModal, setShowAreaModal] = useState(false);
+  
   const [saving, setSaving] = useState(false);
   const [step, setStep] = useState(1); // 1: Profile, 2: Address
+
+  // Load delivery areas when moving to step 2
+  useEffect(() => {
+    if (step === 2) {
+      loadDeliveryAreas();
+    }
+  }, [step]);
+
+  const loadDeliveryAreas = async () => {
+    setLoadingAreas(true);
+    try {
+      const areas = await getActiveDeliveryAreas();
+      setDeliveryAreas(areas);
+      console.log('✅ Loaded active delivery areas:', areas.length);
+    } catch (error) {
+      console.error('Error loading delivery areas:', error);
+      showToast.error('Failed to load delivery areas');
+    } finally {
+      setLoadingAreas(false);
+    }
+  };
+
+  const getSelectedArea = (): DeliveryArea | null => {
+    return deliveryAreas.find(area => area.name === selectedLocation) || null;
+  };
+
+  const handleSelectArea = (area: DeliveryArea) => {
+    setSelectedLocation(area.name);
+    // Auto-fill city, state, pincode from selected area
+    setCity(area.name.split(',').pop()?.trim() || '');
+    setState('Telangana');
+    setPincode(area.pincode);
+    setShowAreaModal(false);
+  };
 
   const validateProfile = () => {
     if (!name.trim()) {
       Alert.alert('Error', 'Please enter your name');
       return false;
     }
+
+    if (!email.trim()) {
+      Alert.alert('Error', 'Please enter your email address');
+      return false;
+    }
+
     if (email && !email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
       Alert.alert('Error', 'Please enter a valid email address');
       return false;
@@ -51,6 +103,10 @@ export const OnboardingScreen = ({ navigation }: any) => {
   const validateAddress = () => {
     if (!addressLabel.trim()) {
       Alert.alert('Error', 'Please enter address label (e.g., Home, Office)');
+      return false;
+    }
+    if (!selectedLocation) {
+      Alert.alert('Error', 'Please select a delivery area');
       return false;
     }
     if (!street.trim()) {
@@ -72,132 +128,106 @@ export const OnboardingScreen = ({ navigation }: any) => {
     return true;
   };
 
-  const refreshUserData = async () => {
+  const handleSkipAddress = async () => {
     if (!user) return;
-    
-    try {
-      // Fetch updated user data from Firestore
-      const updatedUser = await getUserById(user.id);
-      if (updatedUser) {
-        setUser(updatedUser);
-        console.log('✅ User data refreshed:', updatedUser);
+
+    Alert.alert(
+      'Skip Address',
+      'You can add your delivery address later from your profile.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Continue',
+          onPress: async () => {
+            setSaving(true);
+            try {
+              const updatedUser = await getUserById(user.id);
+              
+              if (updatedUser) {
+                setUser(updatedUser);
+                console.log('✅ User state updated after skip');
+              }
+            } catch (error) {
+              console.error('Error fetching user:', error);
+              Alert.alert('Error', 'Something went wrong. Please try again.');
+            } finally {
+              setSaving(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleNext = async () => {
+    if (!user) return;
+
+    if (step === 1) {
+      if (!validateProfile()) return;
+      
+      setSaving(true);
+      try {
+        await updateUserProfile(user.id, {
+          name: name.trim(),
+          email: email.trim(),
+        });
+
+        const updatedUser = await getUserById(user.id);
+        if (updatedUser) {
+          setUser(updatedUser);
+        }
+
+        setStep(2);
+      } catch (error) {
+        console.error('Error updating profile:', error);
+        Alert.alert('Error', 'Failed to update profile');
+      } finally {
+        setSaving(false);
       }
-    } catch (error) {
-      console.error('Error refreshing user data:', error);
+    } else {
+      if (!validateAddress()) return;
+      
+      setSaving(true);
+      try {
+        const addressData = {
+          label: addressLabel.trim(),
+          apartment: apartment.trim(),
+          street: street.trim(),
+          location: selectedLocation,
+          city: city.trim(),
+          state: state.trim(),
+          pincode: pincode.trim(),
+          landmark: landmark.trim(),
+          isDefault: true,
+        };
+
+        await addUserAddress(user.id, addressData);
+
+        const updatedUser = await getUserById(user.id);
+        
+        if (updatedUser) {
+          setUser(updatedUser);
+          
+          console.log('✅ User state updated after address:', {
+            name: updatedUser.name,
+            addressCount: updatedUser.addresses.length,
+          });
+
+          Alert.alert(
+            'Welcome! 🎉',
+            'Your profile is all set up. Start shopping now!'
+          );
+        }
+      } catch (error) {
+        console.error('Error adding address:', error);
+        Alert.alert('Error', 'Failed to add address');
+      } finally {
+        setSaving(false);
+      }
     }
   };
 
-const handleSkipAddress = async () => {
-  if (!user) return;
-
-  Alert.alert(
-    'Skip Address',
-    'You can add your delivery address later from your profile.',
-    [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Continue',
-        onPress: async () => {
-          setSaving(true);
-          try {
-            // Fetch the updated user data from Firestore
-            const updatedUser = await getUserById(user.id);
-            
-            if (updatedUser) {
-              // Update the user state - this will trigger AppNavigator to re-render
-              // and navigate to MainApp automatically
-              setUser(updatedUser);
-              
-              console.log('✅ User state updated after skip:', {
-                name: updatedUser.name,
-                addressCount: updatedUser.addresses.length,
-              });
-            }
-          } catch (error) {
-            console.error('Error fetching user:', error);
-            Alert.alert('Error', 'Something went wrong. Please try again.');
-          } finally {
-            setSaving(false);
-          }
-        },
-      },
-    ]
-  );
-};
-
-const handleNext = async () => {
-  if (!user) return;
-
-  if (step === 1) {
-    if (!validateProfile()) return;
-    
-    setSaving(true);
-    try {
-      await updateUserProfile(user.id, {
-        name: name.trim(),
-        email: email.trim() || undefined,
-      });
-
-      // Fetch updated user data
-      const updatedUser = await getUserById(user.id);
-      
-      if (updatedUser) {
-        // Update local state
-        setUser(updatedUser);
-      }
-
-      // Move to address step
-      setStep(2);
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      Alert.alert('Error', 'Failed to update profile');
-    } finally {
-      setSaving(false);
-    }
-  } else {
-    if (!validateAddress()) return;
-    
-    setSaving(true);
-    try {
-      const addressData = {
-        label: addressLabel.trim(),
-        apartment: apartment.trim(),
-        street: street.trim(),
-        city: city.trim(),
-        state: state.trim(),
-        pincode: pincode.trim(),
-        landmark: landmark.trim(),
-        isDefault: true,
-      };
-
-      await addUserAddress(user.id, addressData);
-
-      // Fetch the complete updated user
-      const updatedUser = await getUserById(user.id);
-      
-      if (updatedUser) {
-        // Update user state - this triggers navigation to MainApp
-        setUser(updatedUser);
-        
-        console.log('✅ User state updated after address:', {
-          name: updatedUser.name,
-          addressCount: updatedUser.addresses.length,
-        });
-
-        // Show success message
-        Alert.alert(
-          'Welcome! 🎉',
-          'Your profile is all set up. Start shopping now!'
-        );
-      }
-    } catch (error) {
-      console.error('Error adding address:', error);
-      Alert.alert('Error', 'Failed to add address');
-    } finally {
-      setSaving(false);
-    }
-  }
-};
+  const selectedArea = getSelectedArea();
 
   return (
     <KeyboardAvoidingView
@@ -215,9 +245,7 @@ const handleNext = async () => {
               ]}
             />
           </View>
-          <Text style={styles.progressText}>
-            Step {step} of 2
-          </Text>
+          <Text style={styles.progressText}>Step {step} of 2</Text>
         </View>
 
         {/* Header */}
@@ -252,7 +280,7 @@ const handleNext = async () => {
 
               {/* Email */}
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Email (Optional)</Text>
+                <Text style={styles.label}>Email</Text>
                 <TextInput
                   style={styles.input}
                   placeholder="your@email.com"
@@ -290,6 +318,69 @@ const handleNext = async () => {
                   autoCapitalize="words"
                   autoFocus
                 />
+              </View>
+
+              {/* Delivery Area Selection */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Delivery Area *</Text>
+                {loadingAreas ? (
+                  <View style={styles.loadingBox}>
+                    <ActivityIndicator size="small" color="#4CAF50" />
+                    <Text style={styles.loadingText}>Loading areas...</Text>
+                  </View>
+                ) : deliveryAreas.length > 0 ? (
+                  <>
+                    <TouchableOpacity
+                      style={[
+                        styles.areaSelector,
+                        selectedLocation && styles.areaSelectorSelected,
+                      ]}
+                      onPress={() => setShowAreaModal(true)}
+                    >
+                      {selectedLocation ? (
+                        <View style={styles.selectedAreaContent}>
+                          <View style={styles.selectedAreaInfo}>
+                            <Text style={styles.selectedAreaText}>
+                              {selectedLocation}
+                            </Text>
+                            {/* {selectedArea && (
+                              <View style={styles.slotsInfo}>
+                                {selectedArea.slots.morning.enabled && (
+                                  <Text style={styles.slotBadge}>
+                                    {DELIVERY_SLOT_ICONS.morning} Morning
+                                  </Text>
+                                )}
+                                {selectedArea.slots.evening.enabled && (
+                                  <Text style={styles.slotBadge}>
+                                    {DELIVERY_SLOT_ICONS.evening} Evening
+                                  </Text>
+                                )}
+                              </View>
+                            )} */}
+                          </View>
+                          <Text style={styles.chevron}>›</Text>
+                        </View>
+                      ) : (
+                        <View style={styles.placeholderContent}>
+                          <Text style={styles.placeholderText}>
+                            Tap to select delivery area
+                          </Text>
+                          <Text style={styles.chevron}>›</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                    <Text style={styles.helpText}>
+                      Select the area where you want deliveries
+                    </Text>
+                  </>
+                ) : (
+                  <View style={styles.noAreasCard}>
+                    <Text style={styles.noAreasIcon}>📍</Text>
+                    <Text style={styles.noAreasText}>
+                      No delivery areas available. Please contact support.
+                    </Text>
+                  </View>
+                )}
               </View>
 
               {/* Apartment/House */}
@@ -373,7 +464,7 @@ const handleNext = async () => {
 
       {/* Footer */}
       <View style={styles.footer}>
-        {step === 2 && (
+        {/* {step === 2 && (
           <TouchableOpacity
             style={styles.skipButton}
             onPress={handleSkipAddress}
@@ -381,12 +472,15 @@ const handleNext = async () => {
           >
             <Text style={styles.skipButtonText}>Skip for now</Text>
           </TouchableOpacity>
-        )}
+        )} */}
 
         <TouchableOpacity
-          style={[styles.nextButton, saving && styles.buttonDisabled]}
+          style={[
+            styles.nextButton,
+            (saving || (step === 2 && deliveryAreas.length === 0)) && styles.buttonDisabled,
+          ]}
           onPress={handleNext}
-          disabled={saving}
+          disabled={saving || (step === 2 && deliveryAreas.length === 0)}
         >
           {saving ? (
             <ActivityIndicator color="#fff" />
@@ -397,6 +491,78 @@ const handleNext = async () => {
           )}
         </TouchableOpacity>
       </View>
+
+      {/* Delivery Area Selection Modal */}
+      <Modal
+        visible={showAreaModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowAreaModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Delivery Area</Text>
+              <TouchableOpacity onPress={() => setShowAreaModal(false)}>
+                <Text style={styles.modalClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Areas List */}
+            <ScrollView style={styles.modalScroll}>
+              {deliveryAreas.map((area) => {
+                const isSelected = selectedLocation === area.name;
+                
+                return (
+                  <TouchableOpacity
+                    key={area.id}
+                    style={[
+                      styles.areaCard,
+                      isSelected && styles.areaCardSelected,
+                    ]}
+                    onPress={() => handleSelectArea(area)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.areaCardContent}>
+                      <View style={styles.areaCardLeft}>
+                        <Text style={styles.areaName}>{area.name}</Text>
+                        <Text style={styles.areaPincode}>Pincode: {area.pincode}</Text>
+                        
+                        {/* Available Slots */}
+                        {/* <View style={styles.areaSlotsRow}>
+                          <Text style={styles.areaSlotsLabel}>Available slots:</Text>
+                          {area.slots.morning.enabled && (
+                            <View style={styles.areaSlotChip}>
+                              <Text style={styles.areaSlotText}>
+                                {DELIVERY_SLOT_ICONS.morning} Morning
+                              </Text>
+                            </View>
+                          )}
+                          {area.slots.evening.enabled && (
+                            <View style={styles.areaSlotChip}>
+                              <Text style={styles.areaSlotText}>
+                                {DELIVERY_SLOT_ICONS.evening} Evening
+                              </Text>
+                            </View>
+                          )}
+                        </View> */}
+                      </View>
+
+                      {/* Selection Indicator */}
+                      {isSelected && (
+                        <View style={styles.checkCircle}>
+                          <Text style={styles.checkMark}>✓</Text>
+                        </View>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };
@@ -478,6 +644,97 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1a1a1a',
   },
+  loadingBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f9f9f9',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 10,
+    padding: 14,
+    gap: 8,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  areaSelector: {
+    backgroundColor: '#f9f9f9',
+    borderWidth: 2,
+    borderColor: '#e0e0e0',
+    borderRadius: 10,
+    padding: 14,
+    minHeight: 56,
+  },
+  areaSelectorSelected: {
+    borderColor: '#4CAF50',
+    backgroundColor: '#E8F5E9',
+  },
+  selectedAreaContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  selectedAreaInfo: {
+    flex: 1,
+  },
+  selectedAreaText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginBottom: 6,
+  },
+  slotsInfo: {
+    flexDirection: 'row',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  slotBadge: {
+    fontSize: 11,
+    color: '#4CAF50',
+    backgroundColor: '#fff',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+  },
+  placeholderContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  placeholderText: {
+    fontSize: 16,
+    color: '#999',
+  },
+  chevron: {
+    fontSize: 24,
+    color: '#ccc',
+  },
+  helpText: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 6,
+  },
+  noAreasCard: {
+    backgroundColor: '#FFF3E0',
+    padding: 16,
+    borderRadius: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FFB300',
+  },
+  noAreasIcon: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  noAreasText: {
+    fontSize: 13,
+    color: '#F57F17',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
   readOnlyInput: {
     backgroundColor: '#f5f5f5',
     borderWidth: 1,
@@ -548,5 +805,107 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: '600',
+  },
+  
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '80%',
+    paddingBottom: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1a1a1a',
+  },
+  modalClose: {
+    fontSize: 28,
+    color: '#999',
+  },
+  modalScroll: {
+    padding: 16,
+  },
+  areaCard: {
+    backgroundColor: '#f9f9f9',
+    borderWidth: 2,
+    borderColor: '#e0e0e0',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  areaCardSelected: {
+    borderColor: '#4CAF50',
+    backgroundColor: '#E8F5E9',
+  },
+  areaCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  areaCardLeft: {
+    flex: 1,
+  },
+  areaName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginBottom: 4,
+  },
+  areaPincode: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 8,
+  },
+  areaSlotsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  areaSlotsLabel: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+  },
+  areaSlotChip: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+  },
+  areaSlotText: {
+    fontSize: 11,
+    color: '#4CAF50',
+    fontWeight: '600',
+  },
+  checkCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#4CAF50',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 12,
+  },
+  checkMark: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 });

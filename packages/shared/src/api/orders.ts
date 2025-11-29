@@ -12,7 +12,8 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { getFirebaseFirestore } from './firebase-config';
-import { Order, OrderStatus, OrderType, COLLECTIONS, PaymentStatus } from '../types';
+import { Order, OrderStatus, OrderType, COLLECTIONS, PaymentStatus, DeliverySlot } from '../types';
+import { DELIVERY_SLOT_LABELS } from '../constants';
 import { getCurrentTimestamp } from '../utils';
 import { getProductById } from './products';
 
@@ -423,6 +424,8 @@ export const generateSubscriptionOrders = async (
         items: itemsWithPrices,
         totalAmount,
         deliveryAddress: subscription.deliveryAddress,
+        DeliverySlot: subscription.deliverySlot,
+        deliverySlotLabel: subscription.deliverySlotLabel,
         status: 'pending',
         scheduledDeliveryDate: Timestamp.fromDate(scheduledDelivery),
         paymentMethod: subscription.paymentMethod,
@@ -564,6 +567,30 @@ export const updatePaymentStatus = async (
     paymentStatus: paymentStatus,
     updatedAt: getCurrentTimestamp(),
   });
+};
+
+/**
+ * Update order delivery slot
+ */
+export const updateOrderDeliverySlot = async (
+  orderId: string,
+  deliverySlot: DeliverySlot
+): Promise<void> => {
+  const db = getFirebaseFirestore();
+  try {
+    const orderRef = doc(db, 'orders', orderId);
+    
+    await updateDoc(orderRef, {
+      deliverySlot,
+      deliverySlotLabel: DELIVERY_SLOT_LABELS[deliverySlot],
+      updatedAt: Timestamp.now(),
+    });
+    
+    console.log('✅ Order delivery slot updated:', orderId);
+  } catch (error) {
+    console.error('Error updating order delivery slot:', error);
+    throw error;
+  }
 };
 
 /**

@@ -18,6 +18,13 @@ import {
   formatCurrency,
   createSubscription,
   UserAddress,
+  DeliverySlot,
+  getDeliveryAreaByName,
+  getAvailableSlotsForSubscription,
+  getDefaultSlotForSubscription,
+  getDeliverySlotLabel,
+  DELIVERY_SLOT_ICONS,
+  DeliveryArea,
   SubscriptionFrequency,
   SubscriptionStatus,
   SubscriptionItem,
@@ -72,6 +79,13 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.COD);
   const [loading, setLoading] = useState(false);
 
+  // Delivery Slot State
+  const [deliveryArea, setDeliveryArea] = useState<DeliveryArea | null>(null);
+  const [availableSlots, setAvailableSlots] = useState<DeliverySlot[]>([]);
+  const [selectedSlot, setSelectedSlot] = useState<DeliverySlot | null>(null);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [slotError, setSlotError] = useState<string | null>(null);
+
   // UPI QR state
   const [showUPIModal, setShowUPIModal] = useState(false);
   const [upiString, setUpiString] = useState('');
@@ -111,6 +125,78 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
       loadApplicableCoupons();
     }
   }, [user, items]);
+
+  // Load delivery slots when address changes
+  useEffect(() => {
+    if (selectedAddress) {
+      loadDeliverySlots();
+    } else {
+      setDeliveryArea(null);
+      setAvailableSlots([]);
+      setSelectedSlot(null);
+      setSlotError(null);
+    }
+  }, [selectedAddress]);
+
+  const loadDeliverySlots = async () => {
+    if (!selectedAddress || !selectedAddress.location) {
+      setSlotError('Delivery area not specified in address');
+      setAvailableSlots([]);
+      setSelectedSlot(null);
+      return;
+    }
+    
+    setLoadingSlots(true);
+    setSlotError(null);
+    try {
+      // Fetch delivery area by exact name match
+      const area = await getDeliveryAreaByName(selectedAddress.location);
+      
+      if (!area) {
+        setSlotError('Delivery area not found. Please contact support.');
+        setDeliveryArea(null);
+        setAvailableSlots([]);
+        setSelectedSlot(null);
+        return;
+      }
+      
+      if (!area.active) {
+        setSlotError('Delivery is currently unavailable in this area.');
+        setDeliveryArea(area);
+        setAvailableSlots([]);
+        setSelectedSlot(null);
+        return;
+      }
+      
+      setDeliveryArea(area);
+      
+      // Get available slots (NO FLEXIBLE option for subscriptions)
+      const slots = getAvailableSlotsForSubscription(area);
+      
+      if (slots.length === 0) {
+        setSlotError('No delivery slots configured for this area. Please contact support.');
+        setAvailableSlots([]);
+        setSelectedSlot(null);
+        return;
+      }
+      
+      setAvailableSlots(slots);
+      
+      // Auto-select first available slot
+      const defaultSlot = getDefaultSlotForSubscription(slots);
+      setSelectedSlot(defaultSlot);
+      
+      console.log('✅ Loaded delivery slots:', slots);
+      console.log('✅ Auto-selected slot:', defaultSlot);
+    } catch (error) {
+      console.error('Error loading delivery slots:', error);
+      setSlotError('Failed to load delivery slots. Please try again.');
+      setAvailableSlots([]);
+      setSelectedSlot(null);
+    } finally {
+      setLoadingSlots(false);
+    }
+  };
 
   const loadApplicableCoupons = async () => {
     if (!user) return;
@@ -366,9 +452,9 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
     }
   };
 
-  const createSubscriptionInDatabase = async (upiTransactionRef?: string) => {
-    if (!user || !selectedAddress) {
-      throw new Error('User or address not available');
+  const createSubscriptionInDatabase = async (transactionRef?: string) => {
+    if (!user || !selectedAddress || !selectedSlot) {
+      throw new Error('User, address, or delivery slot not available');
     }
 
     // Prepare subscription items
@@ -392,20 +478,21 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
       deliveryAddress: selectedAddress,
       startDate: dateToTimestamp(startDate),
       endDate: dateToTimestamp(endDate),
-      transactionId: upiTransactionRef,
+      deliverySlot: selectedSlot,
+      deliverySlotLabel: getDeliverySlotLabel(selectedSlot),
       // Coupon data
       appliedCoupons: appliedCoupons.map((c) => c.couponCode).filter(Boolean) as string[],
       discountAmount: finalPrices.discount,
       freeDeliveryApplied: finalPrices.freeDeliveryApplied,
     };
 
-    console.log('=== Subscription Creation Debug ===');
-    console.log('Applied Coupons:', subscriptionData.appliedCoupons);
-    console.log('Discount Amount:', subscriptionData.discountAmount);
-    console.log('Total Amount:', finalPrices.total);
-    if (upiTransactionRef) {
-      console.log('UPI Transaction Ref:', upiTransactionRef);
+    // transaction reference
+    if(transactionRef) {
+      (subscriptionData as any).transactionId = transactionRef;
     }
+
+    console.log('=== Subscription Creation Debug ===');
+    console.log(subscriptionData);
     console.log('========================');
 
     try {
@@ -455,6 +542,11 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
     if (!selectedAddress) {
       Alert.alert('Error', 'Please select a delivery address');
       handleSelectAddress();
+      return;
+    }
+
+    if (!selectedSlot) {
+      showToast.error('Please select a delivery slot for your subscription');
       return;
     }
 
@@ -678,6 +770,104 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
             >
               <Text style={styles.addAddressText}>+ Add Delivery Address</Text>
             </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Delivery Slot Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>🕐 Delivery Slot</Text>
+            <View style={styles.requiredBadge}>
+              <Text style={styles.requiredText}>Required</Text>
+            </View>
+          </View>
+          
+          <View style={styles.slotImportanceCard}>
+            <Text style={styles.slotImportanceIcon}>📌</Text>
+            <Text style={styles.slotImportanceText}>
+              Your subscription will be delivered at the same time for all deliveries
+            </Text>
+          </View>
+          
+          {loadingSlots ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color="#4CAF50" />
+              <Text style={styles.loadingText}>Loading available slots...</Text>
+            </View>
+          ) : slotError ? (
+            <View style={styles.errorCard}>
+              <Text style={styles.errorIcon}>⚠️</Text>
+              <View style={styles.errorContent}>
+                <Text style={styles.errorTitle}>Slot Configuration Issue</Text>
+                <Text style={styles.errorText}>{slotError}</Text>
+                <TouchableOpacity
+                  style={styles.contactSupportButton}
+                  onPress={() => {
+                    // Navigate to support or show contact info
+                    Alert.alert(
+                      'Contact Support',
+                      'Please contact our support team to enable delivery slots for your area.',
+                      [
+                        { text: 'OK' },
+                      ]
+                    );
+                  }}
+                >
+                  <Text style={styles.contactSupportText}>📞 Contact Support</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : availableSlots.length > 0 ? (
+            <View style={styles.slotsContainer}>
+              {availableSlots.map((slot) => {
+                const isSelected = selectedSlot === slot;
+                const isOnlySlot = availableSlots.length === 1;
+                
+                return (
+                  <TouchableOpacity
+                    key={slot}
+                    style={[
+                      styles.slotOption,
+                      isSelected && styles.slotOptionActive,
+                    ]}
+                    onPress={() => setSelectedSlot(slot)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.slotOptionContent}>
+                      <View style={styles.radioButton}>
+                        {isSelected && <View style={styles.radioButtonInner} />}
+                      </View>
+                      <View style={styles.slotDetails}>
+                        <View style={styles.slotLabelRow}>
+                          <Text style={styles.slotLabel}>
+                            {getDeliverySlotLabel(slot)}
+                          </Text>
+                          {isOnlySlot && (
+                            <View style={styles.onlySlotBadge}>
+                              <Text style={styles.onlySlotText}>Only available slot</Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text style={styles.slotSubtext}>
+                          Consistent delivery time for all {totalDeliveries} deliveries
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.slotIcon}>
+                      {DELIVERY_SLOT_ICONS[slot]}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ) : (
+            <View style={styles.noSlotsCard}>
+              <Text style={styles.noSlotsIcon}>📭</Text>
+              <Text style={styles.noSlotsTitle}>No Slots Available</Text>
+              <Text style={styles.noSlotsText}>
+                Please contact support to set up delivery for this area
+              </Text>
+            </View>
           )}
         </View>
 
@@ -971,9 +1161,12 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
           <Text style={styles.footerPrice}>{formatCurrency(finalPrices.total)}</Text>
         </View>
         <TouchableOpacity
-          style={[styles.createButton, (!selectedAddress || loading) && styles.buttonDisabled]}
+          style={[
+            styles.createButton, 
+            (!selectedAddress || !selectedSlot || loading) && styles.buttonDisabled
+          ]}
           onPress={handleCreateSubscription}
-          disabled={!selectedAddress || loading}
+          disabled={!selectedAddress || !selectedSlot || loading}
         >
           {loading ? (
             <ActivityIndicator color="#fff" />
@@ -987,6 +1180,16 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
             </Text>
           )}
         </TouchableOpacity>
+
+        {/* Show warning if slot not selected */}
+        {selectedAddress && !selectedSlot && !loadingSlots && (
+          <View style={styles.footerWarning}>
+            <Text style={styles.footerWarningText}>
+              ⚠️ Please select a delivery slot to continue
+            </Text>
+          </View>
+        )}
+
       </View>
 
       {/* UPI QR Payment Modal */}
@@ -1339,7 +1542,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
   },
-  radioButton: {
+  radioButton1: {
     width: 24,
     height: 24,
     borderRadius: 12,
@@ -1349,7 +1552,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  radioButtonInner: {
+  radioButtonInner1: {
     width: 12,
     height: 12,
     borderRadius: 6,
@@ -2054,5 +2257,184 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 14,
     color: '#666',
+  },
+  // Delivery Slot Styles
+  requiredBadge: {
+    backgroundColor: '#FEE',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#F44336',
+  },
+  requiredText: {
+    fontSize: 11,
+    color: '#D32F2F',
+    fontWeight: '700',
+  },
+  slotImportanceCard: {
+    flexDirection: 'row',
+    backgroundColor: '#E8F5E9',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+    marginBottom: 12,
+    gap: 8,
+  },
+  slotImportanceIcon: {
+    fontSize: 16,
+  },
+  slotImportanceText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#2E7D32',
+    lineHeight: 18,
+    fontWeight: '500',
+  },
+  slotsContainer: {
+    gap: 12,
+  },
+  slotOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#e0e0e0',
+    backgroundColor: '#f9f9f9',
+  },
+  slotOptionActive: {
+    borderColor: '#4CAF50',
+    backgroundColor: '#e8f5e9',
+  },
+  slotOptionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  radioButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#ccc',
+    marginRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  radioButtonInner: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#4CAF50',
+  },
+  slotDetails: {
+    flex: 1,
+  },
+  slotLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+    marginBottom: 4,
+  },
+  slotLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  onlySlotBadge: {
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#2196F3',
+  },
+  onlySlotText: {
+    fontSize: 10,
+    color: '#1565C0',
+    fontWeight: '600',
+  },
+  slotSubtext: {
+    fontSize: 12,
+    color: '#666',
+    lineHeight: 16,
+  },
+  slotIcon: {
+    fontSize: 32,
+  },
+  errorCard: {
+    flexDirection: 'row',
+    backgroundColor: '#FFEBEE',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#EF5350',
+    gap: 12,
+  },
+  errorIcon: {
+    fontSize: 24,
+  },
+  errorContent: {
+    flex: 1,
+  },
+  errorTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#C62828',
+    marginBottom: 4,
+  },
+  contactSupportButton: {
+    backgroundColor: '#F44336',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  contactSupportText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  noSlotsCard: {
+    padding: 24,
+    backgroundColor: '#FFF3E0',
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFB300',
+  },
+  noSlotsIcon: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
+  noSlotsTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#E65100',
+    marginBottom: 8,
+  },
+  noSlotsText: {
+    fontSize: 13,
+    color: '#F57F17',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  footerWarning: {
+    backgroundColor: '#FFF3CD',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#FFC107',
+  },
+  footerWarningText: {
+    fontSize: 13,
+    color: '#856404',
+    textAlign: 'center',
+    fontWeight: '600',
   },
 });

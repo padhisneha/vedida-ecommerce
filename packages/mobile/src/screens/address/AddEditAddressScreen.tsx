@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+// AddEditAddressScreen.tsx
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,6 +10,7 @@ import {
   Alert,
   ActivityIndicator,
   Switch,
+  Modal,
 } from 'react-native';
 import {
   useAuthStore,
@@ -16,7 +18,11 @@ import {
   updateUserAddress,
   UserAddress,
   getUserById,
+  getActiveDeliveryAreas,
+  DeliveryArea,
+  DELIVERY_SLOT_ICONS,
 } from '@ecommerce/shared';
+import { showToast } from '../../utils/toast';
 
 export const AddEditAddressScreen = ({ route, navigation }: any) => {
   const { address } = route.params || {};
@@ -24,19 +30,71 @@ export const AddEditAddressScreen = ({ route, navigation }: any) => {
   
   const { user, setUser } = useAuthStore();
   
+  // Form fields
   const [label, setLabel] = useState(address?.label || '');
   const [apartment, setApartment] = useState(address?.apartment || '');
   const [street, setStreet] = useState(address?.street || '');
+  const [selectedLocation, setSelectedLocation] = useState(address?.location || '');
   const [city, setCity] = useState(address?.city || '');
   const [state, setState] = useState(address?.state || '');
   const [pincode, setPincode] = useState(address?.pincode || '');
   const [landmark, setLandmark] = useState(address?.landmark || '');
   const [isDefault, setIsDefault] = useState(address?.isDefault || false);
+  
+  // Delivery areas
+  const [deliveryAreas, setDeliveryAreas] = useState<DeliveryArea[]>([]);
+  const [loadingAreas, setLoadingAreas] = useState(true);
+  const [showAreaModal, setShowAreaModal] = useState(false);
+  
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    loadDeliveryAreas();
+  }, []);
+
+  const loadDeliveryAreas = async () => {
+    setLoadingAreas(true);
+    try {
+      const areas = await getActiveDeliveryAreas();
+      setDeliveryAreas(areas);
+      console.log('✅ Loaded active delivery areas:', areas.length);
+      
+      // If editing and location exists, verify it's still active
+      if (isEdit && address?.location) {
+        const locationExists = areas.some(area => area.name === address.location);
+        if (!locationExists) {
+          showToast.error('Your selected area is no longer available. Please select a new one.');
+          setSelectedLocation('');
+        }
+      }
+    } catch (error) {
+      console.error('Error loading delivery areas:', error);
+      showToast.error('Failed to load delivery areas');
+    } finally {
+      setLoadingAreas(false);
+    }
+  };
+
+  const getSelectedArea = (): DeliveryArea | null => {
+    return deliveryAreas.find(area => area.name === selectedLocation) || null;
+  };
+
+  const handleSelectArea = (area: DeliveryArea) => {
+    setSelectedLocation(area.name);
+    // Auto-fill city, state, pincode from selected area
+    setCity(area.name.split(',').pop()?.trim() || '');
+    setState('Telangana'); // You can make this dynamic if needed
+    setPincode(area.pincode);
+    setShowAreaModal(false);
+  };
 
   const validateInputs = () => {
     if (!label.trim()) {
       Alert.alert('Error', 'Please enter address label (e.g., Home, Office)');
+      return false;
+    }
+    if (!selectedLocation) {
+      Alert.alert('Error', 'Please select a delivery area');
       return false;
     }
     if (!street.trim()) {
@@ -68,10 +126,11 @@ export const AddEditAddressScreen = ({ route, navigation }: any) => {
 
     setSaving(true);
     try {
-      const addressData = {
+      const addressData: Partial<UserAddress> = {
         label: label.trim(),
         apartment: apartment.trim(),
         street: street.trim(),
+        location: selectedLocation,  // Store selected delivery area name
         city: city.trim(),
         state: state.trim(),
         pincode: pincode.trim(),
@@ -81,10 +140,10 @@ export const AddEditAddressScreen = ({ route, navigation }: any) => {
 
       if (isEdit) {
         await updateUserAddress(user.id, address.id, addressData);
-        Alert.alert('Success', 'Address updated successfully');
+        showToast.success('Address updated successfully');
       } else {
         await addUserAddress(user.id, addressData);
-        Alert.alert('Success', 'Address added successfully');
+        showToast.success('Address added successfully');
       }
 
       // Refresh user data from Firestore
@@ -104,19 +163,10 @@ export const AddEditAddressScreen = ({ route, navigation }: any) => {
     }
   };
 
+  const selectedArea = getSelectedArea();
+
   return (
     <View style={styles.container}>
-      {/* Header */}
-      {/* <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backButton}>‹ Cancel</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>
-          {isEdit ? 'Edit Address' : 'Add Address'}
-        </Text>
-        <View style={styles.placeholder} />
-      </View> */}
-
       <ScrollView style={styles.scrollView}>
         <View style={styles.form}>
           {/* Label */}
@@ -129,6 +179,67 @@ export const AddEditAddressScreen = ({ route, navigation }: any) => {
               onChangeText={setLabel}
               autoCapitalize="words"
             />
+          </View>
+
+          {/* Delivery Area Selection */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Delivery Area *</Text>
+            {loadingAreas ? (
+              <View style={styles.loadingBox}>
+                <ActivityIndicator size="small" color="#4CAF50" />
+                <Text style={styles.loadingText}>Loading areas...</Text>
+              </View>
+            ) : deliveryAreas.length > 0 ? (
+              <>
+                <TouchableOpacity
+                  style={[
+                    styles.areaSelector,
+                    selectedLocation && styles.areaSelectorSelected,
+                  ]}
+                  onPress={() => setShowAreaModal(true)}
+                >
+                  {selectedLocation ? (
+                    <View style={styles.selectedAreaContent}>
+                      <View style={styles.selectedAreaInfo}>
+                        <Text style={styles.selectedAreaText}>{selectedLocation}</Text>
+                        {/* {selectedArea && (
+                          <View style={styles.slotsInfo}>
+                            {selectedArea.slots.morning.enabled && (
+                              <Text style={styles.slotBadge}>
+                                {DELIVERY_SLOT_ICONS.morning} Morning
+                              </Text>
+                            )}
+                            {selectedArea.slots.evening.enabled && (
+                              <Text style={styles.slotBadge}>
+                                {DELIVERY_SLOT_ICONS.evening} Evening
+                              </Text>
+                            )}
+                          </View>
+                        )} */}
+                      </View>
+                      <Text style={styles.chevron}>›</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.placeholderContent}>
+                      <Text style={styles.placeholderText}>
+                        Tap to select delivery area
+                      </Text>
+                      <Text style={styles.chevron}>›</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+                <Text style={styles.helpText}>
+                  Select the area where you want deliveries
+                </Text>
+              </>
+            ) : (
+              <View style={styles.noAreasCard}>
+                <Text style={styles.noAreasIcon}>📍</Text>
+                <Text style={styles.noAreasText}>
+                  No delivery areas available yet. Please contact support.
+                </Text>
+              </View>
+            )}
           </View>
 
           {/* Apartment/House */}
@@ -155,7 +266,7 @@ export const AddEditAddressScreen = ({ route, navigation }: any) => {
             />
           </View>
 
-          {/* City */}
+          {/* City (Auto-filled, editable) */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>City *</Text>
             <TextInput
@@ -167,7 +278,7 @@ export const AddEditAddressScreen = ({ route, navigation }: any) => {
             />
           </View>
 
-          {/* State */}
+          {/* State (Auto-filled, editable) */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>State *</Text>
             <TextInput
@@ -179,7 +290,7 @@ export const AddEditAddressScreen = ({ route, navigation }: any) => {
             />
           </View>
 
-          {/* Pincode */}
+          {/* Pincode (Auto-filled, editable) */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Pincode *</Text>
             <TextInput
@@ -226,9 +337,12 @@ export const AddEditAddressScreen = ({ route, navigation }: any) => {
       {/* Save Button */}
       <View style={styles.footer}>
         <TouchableOpacity
-          style={[styles.saveButton, saving && styles.buttonDisabled]}
+          style={[
+            styles.saveButton,
+            (saving || deliveryAreas.length === 0) && styles.buttonDisabled,
+          ]}
           onPress={handleSave}
-          disabled={saving}
+          disabled={saving || deliveryAreas.length === 0}
         >
           {saving ? (
             <ActivityIndicator color="#fff" />
@@ -239,6 +353,81 @@ export const AddEditAddressScreen = ({ route, navigation }: any) => {
           )}
         </TouchableOpacity>
       </View>
+
+      {/* Delivery Area Selection Modal */}
+      <Modal
+        visible={showAreaModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowAreaModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Delivery Area</Text>
+              <TouchableOpacity onPress={() => setShowAreaModal(false)}>
+                <Text style={styles.modalClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Areas List */}
+            <ScrollView style={styles.modalScroll}>
+              {deliveryAreas.map((area) => {
+                const isSelected = selectedLocation === area.name;
+                
+                return (
+                  <TouchableOpacity
+                    key={area.id}
+                    style={[
+                      styles.areaCard,
+                      isSelected && styles.areaCardSelected,
+                    ]}
+                    onPress={() => handleSelectArea(area)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.areaCardContent}>
+                      <View style={styles.areaCardLeft}>
+                        <Text style={styles.areaName}>{area.name}</Text>
+                        <Text style={styles.areaPincode}>Pincode: {area.pincode}</Text>
+                        
+                        {/* Available Slots */}
+                        {/* <View style={styles.areaSlotsRow}>
+                          <Text style={styles.areaSlotsLabel}>Available slots:</Text>
+                          {area.slots.morning.enabled && (
+                            <View style={styles.areaSlotChip}>
+                              <Text style={styles.areaSlotText}>
+                                {DELIVERY_SLOT_ICONS.morning} Morning
+                              </Text>
+                            </View>
+                          )}
+                          {area.slots.evening.enabled && (
+                            <View style={styles.areaSlotChip}>
+                              <Text style={styles.areaSlotText}>
+                                {DELIVERY_SLOT_ICONS.evening} Evening
+                              </Text>
+                            </View>
+                          )}
+                          {!area.slots.morning.enabled && !area.slots.evening.enabled && (
+                            <Text style={styles.noSlotsText}>No slots</Text>
+                          )}
+                        </View> */}
+                      </View>
+
+                      {/* Selection Indicator */}
+                      {isSelected && (
+                        <View style={styles.checkCircle}>
+                          <Text style={styles.checkMark}>✓</Text>
+                        </View>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -247,29 +436,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
-  },
-  header: {
-    backgroundColor: '#fff',
-    padding: 20,
-    paddingTop: 60,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  backButton: {
-    fontSize: 16,
-    color: '#4CAF50',
-    fontWeight: '600',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-  },
-  placeholder: {
-    width: 60,
   },
   scrollView: {
     flex: 1,
@@ -295,6 +461,97 @@ const styles = StyleSheet.create({
     padding: 14,
     fontSize: 16,
     color: '#1a1a1a',
+  },
+  loadingBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f9f9f9',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 10,
+    padding: 14,
+    gap: 8,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  areaSelector: {
+    backgroundColor: '#f9f9f9',
+    borderWidth: 2,
+    borderColor: '#e0e0e0',
+    borderRadius: 10,
+    padding: 14,
+    minHeight: 56,
+  },
+  areaSelectorSelected: {
+    borderColor: '#4CAF50',
+    backgroundColor: '#E8F5E9',
+  },
+  selectedAreaContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  selectedAreaInfo: {
+    flex: 1,
+  },
+  selectedAreaText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginBottom: 6,
+  },
+  slotsInfo: {
+    flexDirection: 'row',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  slotBadge: {
+    fontSize: 11,
+    color: '#4CAF50',
+    backgroundColor: '#fff',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+  },
+  placeholderContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  placeholderText: {
+    fontSize: 16,
+    color: '#999',
+  },
+  chevron: {
+    fontSize: 24,
+    color: '#ccc',
+  },
+  helpText: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 6,
+  },
+  noAreasCard: {
+    backgroundColor: '#FFF3E0',
+    padding: 16,
+    borderRadius: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FFB300',
+  },
+  noAreasIcon: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  noAreasText: {
+    fontSize: 13,
+    color: '#F57F17',
+    textAlign: 'center',
+    lineHeight: 18,
   },
   switchContainer: {
     flexDirection: 'row',
@@ -348,5 +605,112 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: '600',
+  },
+  
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '80%',
+    paddingBottom: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1a1a1a',
+  },
+  modalClose: {
+    fontSize: 28,
+    color: '#999',
+  },
+  modalScroll: {
+    padding: 16,
+  },
+  areaCard: {
+    backgroundColor: '#f9f9f9',
+    borderWidth: 2,
+    borderColor: '#e0e0e0',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  areaCardSelected: {
+    borderColor: '#4CAF50',
+    backgroundColor: '#E8F5E9',
+  },
+  areaCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  areaCardLeft: {
+    flex: 1,
+  },
+  areaName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginBottom: 4,
+  },
+  areaPincode: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 8,
+  },
+  areaSlotsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  areaSlotsLabel: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+  },
+  areaSlotChip: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+  },
+  areaSlotText: {
+    fontSize: 11,
+    color: '#4CAF50',
+    fontWeight: '600',
+  },
+  noSlotsText: {
+    fontSize: 11,
+    color: '#f44336',
+    fontStyle: 'italic',
+  },
+  checkCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#4CAF50',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 12,
+  },
+  checkMark: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 });

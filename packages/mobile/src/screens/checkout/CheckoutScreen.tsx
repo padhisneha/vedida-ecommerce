@@ -38,6 +38,13 @@ import {
   calculateOfferDiscount,
   generateUPIString,
   generateTransactionRef,
+  DeliverySlot,
+  getDeliveryAreaByName,
+  getAvailableSlotsForOrder,
+  getDefaultSlotForOrder,
+  getDeliverySlotLabel,
+  DELIVERY_SLOT_ICONS,
+  DeliveryArea,
 } from '@ecommerce/shared';
 import { showToast } from '../../utils/toast';
 
@@ -48,6 +55,12 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
   const [selectedAddress, setSelectedAddress] = useState<UserAddress | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.COD);
   const [loading, setLoading] = useState(false);
+
+  // Delivery slot state
+  const [deliveryArea, setDeliveryArea] = useState<DeliveryArea | null>(null);
+  const [availableSlots, setAvailableSlots] = useState<DeliverySlot[]>([]);
+  const [selectedSlot, setSelectedSlot] = useState<DeliverySlot | null>(null);
+  const [loadingSlots, setLoadingSlots] = useState(false);
 
   // UPI QR state
   const [showUPIModal, setShowUPIModal] = useState(false);
@@ -83,6 +96,17 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
     }
   }, [user]);
 
+  // Load slots when address changes
+  useEffect(() => {
+    if (selectedAddress) {
+      loadDeliverySlots();
+    } else {
+      setDeliveryArea(null);
+      setAvailableSlots([]);
+      setSelectedSlot(null);
+    }
+  }, [selectedAddress]);
+
   useEffect(() => {
     if (user) {
       loadApplicableCoupons();
@@ -92,6 +116,41 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
   useEffect(() => {
     recalculatePrices();
   }, [appliedCoupons]);
+
+  const loadDeliverySlots = async () => {
+    if (!selectedAddress || !selectedAddress.location) {
+      console.log('⚠️ No location in selected address');
+      // Default to FLEXIBLE if no location
+      setAvailableSlots([DeliverySlot.FLEXIBLE]);
+      setSelectedSlot(DeliverySlot.FLEXIBLE);
+      return;
+    }
+    
+    setLoadingSlots(true);
+    try {
+      // Fetch delivery area by exact name match
+      const area = await getDeliveryAreaByName(selectedAddress.location);
+      setDeliveryArea(area);
+      
+      // Get available slots (includes FLEXIBLE)
+      const slots = getAvailableSlotsForOrder(area);
+      setAvailableSlots(slots);
+      
+      // Auto-select default slot
+      const defaultSlot = getDefaultSlotForOrder(slots);
+      setSelectedSlot(defaultSlot);
+      
+      console.log('✅ Loaded delivery slots:', slots);
+      console.log('✅ Auto-selected slot:', defaultSlot);
+    } catch (error) {
+      console.error('Error loading delivery slots:', error);
+      // Fallback to FLEXIBLE only
+      setAvailableSlots([DeliverySlot.FLEXIBLE]);
+      setSelectedSlot(DeliverySlot.FLEXIBLE);
+    } finally {
+      setLoadingSlots(false);
+    }
+  };
 
   const loadApplicableCoupons = async () => {
     if (!user) return;
@@ -246,7 +305,7 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
     });
   };
 
-  const createOrderInDatabase = async (upiTransactionRef?: string) => {
+  const createOrderInDatabase = async (transactionRef?: string) => {
     if (!user || !selectedAddress) {
       throw new Error('User or address not available');
     }
@@ -276,21 +335,21 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
         PaymentStatus.PAID,
       status: OrderStatus.PENDING,
       scheduledDeliveryDate: dateToTimestamp(deliveryDate),
+      deliverySlot: selectedSlot || DeliverySlot.FLEXIBLE,
+      deliverySlotLabel: selectedSlot ? getDeliverySlotLabel(selectedSlot) : 'Flexible Delivery',
       // Coupon data
       appliedCoupons: appliedCoupons.map(c => c.couponCode).filter(Boolean) as string[],
       discountAmount: finalPrices.discount,
       freeDeliveryApplied: finalPrices.freeDeliveryApplied,
-      // UPI transaction reference
-      transactionId: upiTransactionRef,
     };
 
-    console.log('=== Order Creation Debug ===');
-    console.log('Applied Coupons:', orderData.appliedCoupons);
-    console.log('Discount Amount:', orderData.discountAmount);
-    console.log('Total Amount:', orderData.totalAmount);
-    if (upiTransactionRef) {
-      console.log('UPI Transaction Ref:', upiTransactionRef);
+    // transaction reference
+    if(transactionRef) {
+      (orderData as any).transactionId = transactionRef;
     }
+
+    console.log('=== Order Creation Debug ===');
+    console.log(orderData);
     console.log('========================');
 
     try {
@@ -593,6 +652,84 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Delivery Slot Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>🕐 Delivery Slot</Text>
+            <Text style={styles.optionalBadge}>Optional</Text>
+          </View>
+          
+          {loadingSlots ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color="#4CAF50" />
+              <Text style={styles.loadingText}>Loading available slots...</Text>
+            </View>
+          ) : availableSlots.length > 0 ? (
+            <View style={styles.slotsContainer}>
+              {availableSlots.map((slot) => {
+                const isOnlySlot = availableSlots.length === 2 && slot !== DeliverySlot.FLEXIBLE;
+                const isSelected = selectedSlot === slot;
+                
+                return (
+                  <TouchableOpacity
+                    key={slot}
+                    style={[
+                      styles.slotOption,
+                      isSelected && styles.slotOptionActive,
+                    ]}
+                    onPress={() => setSelectedSlot(slot)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.slotOptionContent}>
+                      <View style={styles.radioButton}>
+                        {isSelected && <View style={styles.radioButtonInner} />}
+                      </View>
+                      <View style={styles.slotDetails}>
+                        <View style={styles.slotLabelRow}>
+                          <Text style={styles.slotLabel}>
+                            {getDeliverySlotLabel(slot)}
+                          </Text>
+                          {isOnlySlot && (
+                            <View style={styles.autoSelectedBadge}>
+                              <Text style={styles.autoSelectedText}>Auto-selected</Text>
+                            </View>
+                          )}
+                        </View>
+                        {slot === DeliverySlot.FLEXIBLE && (
+                          <Text style={styles.slotSubtext}>
+                            Our team will coordinate the best delivery time
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                    <Text style={styles.slotIcon}>
+                      {DELIVERY_SLOT_ICONS[slot]}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+              
+              {/* Info message if no slots configured */}
+              {availableSlots.length === 1 && availableSlots[0] === DeliverySlot.FLEXIBLE && (
+                <View style={styles.infoCard}>
+                  <Text style={styles.infoIcon}>ℹ️</Text>
+                  <Text style={styles.infoText}>
+                    Delivery time slots are not configured for this area yet. 
+                    Our team will coordinate the delivery time with you.
+                  </Text>
+                </View>
+              )}
+            </View>
+          ) : (
+            <View style={styles.noSlotsCard}>
+              <Text style={styles.noSlotsText}>
+                Unable to load delivery slots
+              </Text>
+            </View>
+          )}
+        </View>
+        
 
         {/* Coupons Section */}
         <View style={styles.section}>
@@ -1407,12 +1544,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1a1a1a',
   },
-  infoCard: {
+  infoCard1: {
     backgroundColor: '#f0f9ff',
     padding: 16,
     borderRadius: 12,
   },
-  infoText: {
+  infoText1: {
     fontSize: 14,
     color: '#1e40af',
     marginBottom: 8,
@@ -1942,5 +2079,103 @@ const styles = StyleSheet.create({
     color: '#2E7D32',
     fontWeight: '600',
   },
-  // ... rest of existing styles from original file ...
+  optionalBadge: {
+    fontSize: 12,
+    color: '#666',
+    backgroundColor: '#f0f0f0',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    fontWeight: '500',
+  },
+  slotsContainer: {
+    gap: 12,
+  },
+  slotOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#e0e0e0',
+    backgroundColor: '#f9f9f9',
+  },
+  slotOptionActive: {
+    borderColor: '#4CAF50',
+    backgroundColor: '#e8f5e9',
+  },
+  slotOptionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  slotDetails: {
+    flex: 1,
+  },
+  slotLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  slotLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  autoSelectedBadge: {
+    backgroundColor: '#FFF3CD',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#FFC107',
+  },
+  autoSelectedText: {
+    fontSize: 10,
+    color: '#856404',
+    fontWeight: '600',
+  },
+  slotSubtext: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+    lineHeight: 16,
+  },
+  slotIcon: {
+    fontSize: 28,
+  },
+  infoCard: {
+    flexDirection: 'row',
+    backgroundColor: '#E3F2FD',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#2196F3',
+    marginTop: 4,
+    gap: 8,
+  },
+  infoIcon: {
+    fontSize: 16,
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#1565C0',
+    lineHeight: 18,
+  },
+  noSlotsCard: {
+    padding: 16,
+    backgroundColor: '#fff3e0',
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ffb300',
+  },
+  noSlotsText: {
+    fontSize: 14,
+    color: '#f57f17',
+    textAlign: 'center',
+  },
 });

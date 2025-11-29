@@ -9,6 +9,7 @@ import {
   where,
   orderBy,
   limit,
+  Timestamp,
 } from 'firebase/firestore';
 import { getFirebaseFirestore } from './firebase-config';
 import {
@@ -16,7 +17,9 @@ import {
   SubscriptionStatus,
   SubscriptionItem,
   COLLECTIONS,
+  DeliverySlot,
 } from '../types';
+import { DELIVERY_SLOT_LABELS } from '../constants';
 import { getCurrentTimestamp } from '../utils';
 import { getProductById } from './products';
 
@@ -391,6 +394,30 @@ export const updateSubscriptionPaymentStatus = async (
     paymentStatus: paymentStatus,
     updatedAt: getCurrentTimestamp(),
   });
+};
+
+/**
+ * Update subscription delivery slot
+ */
+export const updateSubscriptionDeliverySlot = async (
+  subscriptionId: string,
+  deliverySlot: DeliverySlot
+): Promise<void> => {
+  const db = getFirebaseFirestore();
+  try {
+    const subscriptionRef = doc(db, 'subscriptions', subscriptionId);
+    
+    await updateDoc(subscriptionRef, {
+      deliverySlot,
+      deliverySlotLabel: DELIVERY_SLOT_LABELS[deliverySlot],
+      updatedAt: Timestamp.now(),
+    });
+    
+    console.log('✅ Subscription delivery slot updated:', subscriptionId);
+  } catch (error) {
+    console.error('Error updating subscription delivery slot:', error);
+    throw error;
+  }
 };
 
 /**

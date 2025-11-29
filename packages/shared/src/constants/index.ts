@@ -1,3 +1,5 @@
+import { DeliverySlot } from '../types';
+
 /**
  * Platform fee charged per order (in rupees)
  */
@@ -39,6 +41,24 @@ export const SUPPORT_CONTACT = {
   whatsapp: '8247099516', // Without + sign for WhatsApp
   businessName: 'Vedida Farms Support',
   workingHours: 'Mon-Sat: 7 AM - 8 PM',
+};
+
+/**
+ * Delivery Slot Labels
+ */
+export const DELIVERY_SLOT_LABELS = {
+  [DeliverySlot.MORNING]: 'Morning (6 AM - 12 PM)',
+  [DeliverySlot.EVENING]: 'Evening (4 PM - 8 PM)',
+  [DeliverySlot.FLEXIBLE]: 'Flexible Delivery (Any Time)',
+};
+
+/**
+ * Delivery Slot icons
+ */
+export const DELIVERY_SLOT_ICONS = {
+  [DeliverySlot.MORNING]: '🌅',
+  [DeliverySlot.EVENING]: '🌆',
+  [DeliverySlot.FLEXIBLE]: '🕐',
 };
 
 /**

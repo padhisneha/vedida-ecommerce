@@ -1,3 +1,4 @@
+// packages/web/app/%28dashboard%29/dashboard/subscriptions/[id]/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -19,6 +20,7 @@ import {
   formatCurrency,
   formatDate,
   formatDateTime,
+  updateSubscriptionDeliverySlot,
 } from '@ecommerce/shared';
 import { showToast } from '@/lib/toast';
 import { generateSubscriptionInvoicePDF } from '@/lib/invoice-generator';
@@ -38,6 +40,10 @@ export default function SubscriptionDetailPage({ params }: { params: { id: strin
   const [paymentMethodValue, setPaymentMethodValue] = useState<'cod' | 'online' | 'upi'>('cod');
   const [paymentStatusValue, setPaymentStatusValue] = useState<'pending' | 'paid' | 'failed'>('pending');
   const [savingPayment, setSavingPayment] = useState(false);
+
+  const [editingSlot, setEditingSlot] = useState(false);
+  const [slotValue, setSlotValue] = useState<'morning' | 'evening'>('morning');
+  const [savingSlot, setSavingSlot] = useState(false);
 
   useEffect(() => {
     loadSubscription();
@@ -153,6 +159,31 @@ export default function SubscriptionDetailPage({ params }: { params: { id: strin
       showToast.error('Failed to assign delivery partner');
     } finally {
       setAssigning(false);
+    }
+  };
+
+  const handleSaveSlot = async () => {
+    if (!subscription) return;
+
+    if (!confirm('Update delivery slot for this subscription?')) {
+      return;
+    }
+
+    setSavingSlot(true);
+    const toastId = showToast.loading('Updating delivery slot...');
+
+    try {
+      await updateSubscriptionDeliverySlot(subscription.id, slotValue);
+      showToast.dismiss(toastId);
+      showToast.success('Delivery slot updated successfully!');
+      setEditingSlot(false);
+      await loadSubscription();
+    } catch (error) {
+      console.error('Error updating delivery slot:', error);
+      showToast.dismiss(toastId);
+      showToast.error('Failed to update delivery slot');
+    } finally {
+      setSavingSlot(false);
     }
   };
 
@@ -557,6 +588,83 @@ export default function SubscriptionDetailPage({ params }: { params: { id: strin
                 </a>
               </div>
             </div>
+          </div>
+
+          {/* Delivery Slot */}
+          <div className="card">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-gray-900">
+                🕐 Delivery Slot
+              </h2>
+              {!editingSlot && subscription.status === SubscriptionStatus.ACTIVE && (
+                <button
+                  onClick={() => {
+                    setEditingSlot(true);
+                    setSlotValue(subscription.deliverySlot || 'morning');
+                  }}
+                  className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                >
+                  ✏️ Edit
+                </button>
+              )}
+            </div>
+
+            {editingSlot ? (
+              <div>
+                <select
+                  className="input mb-3"
+                  value={slotValue}
+                  onChange={(e) => setSlotValue(e.target.value as 'morning' | 'evening')}
+                  disabled={savingSlot}
+                >
+                  <option value="morning">🌅 Morning (6 AM - 12 PM)</option>
+                  <option value="evening">🌆 Evening (4 PM - 8 PM)</option>
+                </select>
+                
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                  <p className="text-sm text-blue-800">
+                    ℹ️ This will change the delivery slot for all future deliveries of this subscription.
+                  </p>
+                </div>
+                
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSaveSlot}
+                    disabled={savingSlot}
+                    className="btn-primary flex items-center gap-2"
+                  >
+                    <span>💾</span>
+                    <span>{savingSlot ? 'Saving...' : 'Save Slot'}</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditingSlot(false);
+                      setSlotValue(subscription.deliverySlot || 'morning');
+                    }}
+                    disabled={savingSlot}
+                    className="btn-secondary"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-lg border-2 border-green-200">
+                <div className="flex items-center gap-3">
+                  <span className="text-4xl">
+                    {subscription.deliverySlot === 'morning' ? '🌅' : '🌆'}
+                  </span>
+                  <div>
+                    <p className="font-semibold text-gray-900 text-lg">
+                      {subscription.deliverySlotLabel || 'Not specified'}
+                    </p>
+                    <p className="text-sm text-gray-600 mt-1">
+                      All deliveries arrive during this time
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Subscription Info */}

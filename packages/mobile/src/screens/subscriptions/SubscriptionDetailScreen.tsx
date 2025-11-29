@@ -1,3 +1,4 @@
+// packages/mobile/src/screens/subscriptions/SubscriptionDetailScreen.tsx
 import React, { useEffect, useState } from 'react';
 import {
     View,
@@ -230,7 +231,7 @@ export const SubscriptionDetailScreen = ({ route, navigation }: any) => {
                     <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
                         <Text style={styles.statusText}>{getStatusText(subscription.status)}</Text>
                     </View>
-                    <Text style={styles.subscriptionId}>#{subscription.id.slice(0, 8)}</Text>
+                    <Text style={styles.subscriptionId}>#{subscription.subscriptionNumber}</Text>
                     <Text style={styles.frequency}>{getFrequencyText(subscription.frequency)}</Text>
                 </View>
 
@@ -321,6 +322,26 @@ export const SubscriptionDetailScreen = ({ route, navigation }: any) => {
                     </View>
                 </View>
 
+                {/* Delivery Slot */}
+                {subscription.deliverySlot && (
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>🕐 Delivery Slot</Text>
+                    <View style={styles.deliverySlotCard}>
+                    <Text style={styles.deliverySlotIcon}>
+                        {subscription.deliverySlot === 'morning' ? '🌅' : '🌆'}
+                    </Text>
+                    <View style={styles.deliverySlotContent}>
+                        <Text style={styles.deliverySlotLabel}>
+                        {subscription.deliverySlotLabel || 'Delivery Slot'}
+                        </Text>
+                        <Text style={styles.deliverySlotNote}>
+                        All deliveries will arrive during this time
+                        </Text>
+                    </View>
+                    </View>
+                </View>
+                )}
+
                 {/* Action Buttons */}
                 {subscription.status !== SubscriptionStatus.CANCELLED && 
                 subscription.status !== SubscriptionStatus.COMPLETED && (
@@ -336,13 +357,13 @@ export const SubscriptionDetailScreen = ({ route, navigation }: any) => {
                         >
                             <Text style={styles.pauseButtonText}>⏸️ Pause Subscription</Text>
                         </TouchableOpacity>
-                        {/* <TouchableOpacity
+                        <TouchableOpacity
                             style={[styles.actionButton, styles.cancelButton]}
                             onPress={handleCancelSubscription}
                             disabled={actionLoading}
                         >
                             <Text style={styles.cancelButtonText}>❌ Cancel Subscription</Text>
-                        </TouchableOpacity> */}
+                        </TouchableOpacity>
                         </>
                     )}
 
@@ -359,13 +380,13 @@ export const SubscriptionDetailScreen = ({ route, navigation }: any) => {
                             <Text style={styles.resumeButtonText}>▶️ Resume Subscription</Text>
                             )}
                         </TouchableOpacity>
-                        {/* <TouchableOpacity
+                        <TouchableOpacity
                             style={[styles.actionButton, styles.cancelButton]}
                             onPress={handleCancelSubscription}
                             disabled={actionLoading}
                         >
                             <Text style={styles.cancelButtonText}>❌ Cancel Subscription</Text>
-                        </TouchableOpacity> */}
+                        </TouchableOpacity>
                         </>
                     )}
                     </View>
@@ -692,5 +713,32 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#d32f2f',
         textAlign: 'center',
+    },
+    deliverySlotCard: {
+        backgroundColor: '#E8F5E9',
+        padding: 16,
+        borderRadius: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#4CAF50',
+    },
+    deliverySlotIcon: {
+        fontSize: 32,
+        marginRight: 12,
+    },
+    deliverySlotContent: {
+        flex: 1,
+    },
+    deliverySlotLabel: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#2E7D32',
+        marginBottom: 4,
+    },
+    deliverySlotNote: {
+        fontSize: 12,
+        color: '#4CAF50',
+        lineHeight: 16,
     },
 });

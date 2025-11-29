@@ -165,7 +165,7 @@ export const SubscriptionsScreen = ({ navigation }: any) => {
         {/* Header */}
         <View style={styles.cardHeader}>
           <View>
-            <Text style={styles.subscriptionId}>#{item.id.slice(0, 8)}</Text>
+            <Text style={styles.subscriptionId}>#{item.subscriptionNumber}</Text>
             <Text style={styles.frequency}>{getFrequencyText(item.frequency)}</Text>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>

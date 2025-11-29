@@ -1,3 +1,4 @@
+// packages/web/app/(dashboard)/dashboard/inventory/new/page.tsx
 'use client';
 
 import { useState } from 'react';

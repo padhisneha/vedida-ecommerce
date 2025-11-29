@@ -13,6 +13,7 @@ export enum UserRole {
 
 export interface UserAddress {
   id: string;
+  location: string; // e.g. Janapriya NileValley Block 1, Ameenpur
   label: string; // e.g., "Home", "Office"
   street: string;
   apartment?: string;
@@ -161,6 +162,10 @@ export interface Subscription {
   discountAmount?: number;
   freeDeliveryApplied?: boolean;
 
+  // Delivery Slot
+  deliverySlot: DeliverySlot;  // Selected delivery slot
+  deliverySlotLabel: string;   // e.g., "Morning (6 AM - 12 PM)"
+
   // Delivery Partner fields
   deliveryPartnerId?: string;
   deliveryPartnerName?: string;
@@ -216,11 +221,43 @@ export interface Order {
   paymentStatus?: PaymentStatus;
   transactionId?: string;
 
+  // Delivery Slot
+  deliverySlot?: DeliverySlot;  // Optional for one-time orders
+  deliverySlotLabel?: string;   // e.g., "Morning (6 AM - 12 PM)"
+
   // Delivery Partner fields
   deliveryPartnerId?: string;
   deliveryPartnerName?: string; // Denormalized for quick display
   deliveryNotes?: string;
 
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+// ============================================================================
+// Delivery Types
+// ============================================================================
+
+export enum DeliverySlot {
+  MORNING = 'morning',    // e.g., 6 AM - 12 PM
+  EVENING = 'evening',    // e.g., 4 PM - 8 PM
+  FLEXIBLE = 'flexible',  // e.g., Any time during the day, For one-time orders only
+}
+
+export interface DeliveryArea {
+  id: string;
+  name: string;  // e.g., "Janapriya Nile Valley Block 1, Ameenpur"
+  pincode: string;
+  active: boolean;
+  // Delivery slot configuration
+  slots: {
+    morning: {
+      enabled: boolean;
+    };
+    evening: {
+      enabled: boolean;
+    };
+  };
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -235,6 +272,7 @@ export const COLLECTIONS = {
   CARTS: 'carts',
   SUBSCRIPTIONS: 'subscriptions',
   ORDERS: 'orders',
+  DELIVERY_SLOT_CONFIGS: 'deliverySlotConfigs',
 } as const;
 
 

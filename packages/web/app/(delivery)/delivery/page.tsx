@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   getAllOrders,
+  getAllOrdersWithProducts,
   updateOrderStatus,
   Order,
   OrderStatus,
@@ -49,7 +50,7 @@ export default function DeliveryPartnerHomePage() {
     
     setLoading(true);
     try {
-      const allOrders = await getAllOrders();
+      const allOrders = await getAllOrdersWithProducts(); //getAllOrders();
       
       // Filter orders assigned to this delivery partner
       const myOrders = allOrders.filter(
@@ -567,7 +568,7 @@ export default function DeliveryPartnerHomePage() {
                     <div className="space-y-1">
                       {order.items.slice(0, 2).map((item, idx) => (
                         <div key={idx} className="text-sm text-gray-700">
-                          • {item.quantity}x at {formatCurrency(item.price)} each
+                          • {item.product?.name || 'Product'} ({item.product?.quantity} {item.product?.unit}) x {item.quantity} 
                         </div>
                       ))}
                       {order.items.length > 2 && (
