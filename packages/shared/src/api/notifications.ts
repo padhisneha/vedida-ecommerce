@@ -1,3 +1,4 @@
+// packages/shared/src/api/notifications.ts
 import {
   collection,
   addDoc,

@@ -16,29 +16,38 @@ import {
   UserRole,
   formatCurrency,
   formatDate,
+  getAllProducts,
+  Product,
+  getLowStockProducts, 
+  getOutOfStockProducts,
 } from '@ecommerce/shared';
 import { showToast } from '@/lib/toast';
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [customers, setCustomers] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [lowStockProducts, setLowStockProducts] = useState<Product[]>([]);
+  const [outOfStockProducts, setOutOfStockProducts] = useState<Product[]>([]);
 
   useEffect(() => {
     loadDashboardData();
+    loadStockAlerts();
   }, []);
 
   const loadDashboardData = async () => {
     try {
-      const [ordersData, subsData, usersData] = await Promise.all([
+      const [ordersData, subsData, usersData, productData] = await Promise.all([
         getAllOrdersWithProducts(), // Changed from getAllOrders
         getAllSubscriptions(),
         getAllUsers(),
+        getAllProducts(),
       ]);
-
+      setProducts(productData);
       setOrders(ordersData);
       setSubscriptions(subsData);
       setCustomers(usersData.filter((u) => u.role === UserRole.CUSTOMER).length);
@@ -50,6 +59,28 @@ export default function DashboardPage() {
       setLoading(false);
     }
   };
+
+  const loadStockAlerts = async () => {
+    try {
+      const [lowStock, outOfStock] = await Promise.all([
+        getLowStockProducts(),
+        getOutOfStockProducts(),
+      ]);
+      
+      setLowStockProducts(lowStock);
+      setOutOfStockProducts(outOfStock);
+    } catch (error) {
+      console.error('Error loading stock alerts:', error);
+    }
+  };
+
+  // const getLowStockProducts = () => {
+  //   return products.filter((p) => p.availableStock > 0 && p.availableStock <= p.lowStockThreshold);
+  // };
+
+  // const getOutOfStockProducts = () => {
+  //   return products.filter((p) => p.availableStock === 0);
+  // };
 
   const getActiveOrders = () => {
     return orders.filter(
@@ -94,7 +125,7 @@ export default function DashboardPage() {
 
   const getTodayDeliverySummary = () => {
     const todayOrders = getTodayOrders();
-    const productMap = new Map<string, { name: string; productQuantity: Number, ProductUnit: string, quantity: number; }>();
+    const productMap = new Map<string, { name: string; productQuantity: Number, productUnit: string, quantity: number; }>();
 
     todayOrders.forEach((order) => {
       order.items.forEach((item) => {
@@ -105,14 +136,14 @@ export default function DashboardPage() {
           const existing = productMap.get(productKey) || { 
             name: product.name, 
             productQuantity: product.quantity,
-            ProductUnit: product.unit,
+            productUnit: product.unit,
             quantity: 0
           };
           
           productMap.set(productKey, {
             name: product.name,
             productQuantity: product.quantity,
-            ProductUnit: product.unit,
+            productUnit: product.unit,
             quantity: existing.quantity + item.quantity
           });
         }
@@ -229,6 +260,8 @@ export default function DashboardPage() {
   const deliverySummary = getTodayDeliverySummary();
   const recentActivity = getRecentActivity();
 
+  //alert(lowStockProducts.length);
+
   return (
     <div className="p-8">
       <div className="mb-8">
@@ -239,6 +272,79 @@ export default function DashboardPage() {
           Here's what's happening with your business today
         </p>
       </div>
+
+      {/* Stock Alerts on dashboard */}
+      {(lowStockProducts.length > 0 || outOfStockProducts.length > 0) && (
+        <div className="mb-6 space-y-3">
+          {/* Out of Stock Alert */}
+          {outOfStockProducts.length > 0 && (
+            <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl">❌</span>
+                <div className="flex-1">
+                  <h3 className="font-bold text-red-900 mb-2">
+                    Out of Stock Alert ({outOfStockProducts.length} {outOfStockProducts.length === 1 ? 'product' : 'products'})
+                  </h3>
+                  <div className="space-y-1">
+                    {outOfStockProducts.slice(0, 3).map((product) => (
+                      <Link
+                        key={product.id}
+                        href={`/dashboard/inventory/${product.id}`}
+                        className="block text-sm text-red-700 hover:text-red-900 hover:underline"
+                      >
+                        • {product.name} ({product.quantity} {product.unit})
+                      </Link>
+                    ))}
+                    {outOfStockProducts.length > 3 && (
+                      <Link
+                        href="/dashboard/inventory?stock=out"
+                        className="block text-sm text-red-600 hover:text-red-800 font-medium mt-2"
+                      >
+                        + {outOfStockProducts.length - 3} more →
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Low Stock Alert */}
+          {lowStockProducts.length > 0 && (
+            <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl">⚠️</span>
+                <div className="flex-1">
+                  <h3 className="font-bold text-yellow-900 mb-2">
+                    Low Stock Alert ({lowStockProducts.length} {lowStockProducts.length === 1 ? 'product' : 'products'})
+                  </h3>
+                  <div className="space-y-1">
+                    {lowStockProducts.slice(0, 3).map((product) => (
+                      <Link
+                        key={product.id}
+                        href={`/dashboard/inventory/${product.id}`}
+                        className="block text-sm text-yellow-700 hover:text-yellow-900 hover:underline"
+                      >
+                        • {product.name} ({product.quantity} {product.unit}) - {product.availableStock} units remaining
+                      </Link>
+                    ))}
+                    {lowStockProducts.length > 3 && (
+                      <Link
+                        href="/dashboard/inventory?stock=low"
+                        className="block text-sm text-yellow-600 hover:text-yellow-800 font-medium mt-2"
+                      >
+                        + {lowStockProducts.length - 3} more →
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -319,7 +425,7 @@ export default function DashboardPage() {
                   <span className="font-medium text-gray-900">{item.name}</span>
                 </div>
                 <span className="text-lg font-bold text-primary-600">
-                  {item.quantity} x {item.productQuantity} {item.ProductUnit}
+                  {item.quantity} x {item.productQuantity} {item.productUnit}
                 </span>
               </div>
             ))}
@@ -413,7 +519,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Link href="/dashboard/orders?tab=new" className="card hover:shadow-md transition-shadow cursor-pointer">
           <div className="text-center">
             <div className="text-4xl mb-3">📦</div>
@@ -448,8 +554,20 @@ export default function DashboardPage() {
               Items needing restock
             </p>
             <div className="text-2xl font-bold text-red-600">
-              {/* This would need a proper inventory tracking system */}
-              0
+              {lowStockProducts.length}
+            </div>
+          </div>
+        </Link>
+
+        <Link href="/dashboard/inventory" className="card hover:shadow-md transition-shadow cursor-pointer">
+          <div className="text-center">
+            <div className="text-4xl mb-3">❌</div>
+            <h3 className="font-semibold text-gray-900 mb-2">Out of Stock Items</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Items needing restock
+            </p>
+            <div className="text-2xl font-bold text-red-600">
+              {outOfStockProducts.length}
             </div>
           </div>
         </Link>

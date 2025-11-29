@@ -23,6 +23,10 @@ export enum NotificationType {
   
   // Delivery Partner related
   DELIVERY_PARTNER_REGISTERED = 'delivery_partner_registered',
+
+  // Inventory related
+  LOW_STOCK_ALERT = 'low_stock_alert',
+  OUT_OF_STOCK_ALERT = 'out_of_stock_alert',
   
   // System
   SYSTEM_ALERT = 'system_alert',

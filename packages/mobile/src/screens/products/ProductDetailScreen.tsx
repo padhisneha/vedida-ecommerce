@@ -17,6 +17,7 @@ import {
   useAuthStore,
   useCartStore,
   getCartWithProducts,
+  getProductEmoji,
 } from '@ecommerce/shared';
 
 export const ProductDetailScreen = ({ route, navigation }: any) => {
@@ -81,22 +82,6 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
     if (quantity > 1) {
       setQuantity((prev) => prev - 1);
     }
-  };
-
-  const getProductEmoji = (category: string) => {
-    if (!category) return '📦';
-    
-    const emojis: Record<string, string> = {
-        milk: '🥛',
-        ghee: '🧈',
-        paneer: '🧀',
-        curd: '🥣',
-        butter: '🧈',
-        cheese: '🧀',
-    };
-    
-    const key = category.toLowerCase();
-    return emojis[key] || '📦';
   };
 
   if (loading) {

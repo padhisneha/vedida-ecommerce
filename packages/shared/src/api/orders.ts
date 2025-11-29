@@ -10,12 +10,14 @@ import {
   orderBy,
   limit,
   Timestamp,
+  or,
 } from 'firebase/firestore';
 import { getFirebaseFirestore } from './firebase-config';
 import { Order, OrderStatus, OrderType, COLLECTIONS, PaymentStatus, DeliverySlot } from '../types';
 import { DELIVERY_SLOT_LABELS } from '../constants';
 import { getCurrentTimestamp } from '../utils';
 import { getProductById } from './products';
+import { reduceStockForOrder, checkStockAvailability, restoreStockForOrder } from './stock';
 
 /**
  * Generate order number
@@ -51,6 +53,21 @@ export const createOrder = async (
   orderData: Omit<Order, 'id' | 'orderNumber' | 'createdAt' | 'updatedAt'>
 ): Promise<string> => {
   const db = getFirebaseFirestore();
+
+  // STEP 1: Validate stock availability BEFORE creating order
+  const stockCheck = await checkStockAvailability(orderData.items);
+  
+  if (!stockCheck.available) {
+    const insufficientList = stockCheck.insufficientItems
+      .map(item => `${item.productName}: Need ${item.required}, Available ${item.available}`)
+      .join(', ');
+    
+    throw new Error(
+      `Insufficient stock for: ${insufficientList}`
+    );
+  }
+
+  // STEP 2: Create the order
   const timestamp = getCurrentTimestamp();
   const orderNumber = await generateOrderNumber();
 
@@ -62,7 +79,19 @@ export const createOrder = async (
   };
 
   const docRef = await addDoc(collection(db, COLLECTIONS.ORDERS), newOrder);
-  return docRef.id;
+  const orderId = docRef.id;
+
+  // STEP 3: Reduce stock for all items
+  try {
+    await reduceStockForOrder(orderId, orderNumber, orderData.items);
+    console.log(`✅ Order created and stock reduced: ${orderNumber}`);
+  } catch (stockError) {
+    console.error('Stock reduction failed after order creation:', stockError);
+    // Order is created but stock not reduced - admin needs to handle manually
+    // Could implement compensation logic here if needed
+  }
+
+  return orderId;
 };
 
 /**
@@ -242,19 +271,67 @@ export const getOrderByIdWithProducts = async (orderId: string): Promise<Order |
  */
 export const updateOrderStatus = async (
   orderId: string,
-  status: OrderStatus
+  newStatus: OrderStatus
 ): Promise<void> => {
   const db = getFirebaseFirestore();
-  const updates: any = {
-    status,
-    updatedAt: getCurrentTimestamp(),
-  };
 
-  if (status === OrderStatus.DELIVERED) {
-    updates.deliveredAt = getCurrentTimestamp();
+  // If cancelling, need to restore stock
+  if (newStatus === OrderStatus.CANCELLED) {
+    // Get order details first
+    const orderRef = doc(db, COLLECTIONS.ORDERS, orderId);
+    const orderDoc = await getDoc(orderRef);
+    
+    if (!orderDoc.exists()) {
+      throw new Error('Order not found');
+    }
+    
+    const order = orderDoc.data() as Order;
+    
+    // Don't restore stock if already delivered
+    if (order.status === OrderStatus.DELIVERED) {
+      throw new Error('Cannot cancel delivered orders');
+    }
+    
+    // Only restore stock if order was confirmed (meaning stock was already reduced)
+    if (
+      order.status === OrderStatus.PENDING ||
+      order.status === OrderStatus.CONFIRMED ||
+      order.status === OrderStatus.OUT_FOR_DELIVERY
+    ) {
+      try {
+        // Prepare items with product names for better logging
+        const itemsWithNames = order.items.map(item => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          productName: item.product?.name,
+        }));
+        
+        await restoreStockForOrder(
+          orderId,
+          order.orderNumber,
+          itemsWithNames,
+          'system',
+          'System'
+        );
+        
+        console.log(`✅ Stock restored for cancelled order ${order.orderNumber}`);
+      } catch (stockError) {
+        console.error('Stock restoration failed:', stockError);
+        // Still proceed with cancellation, but log the error
+        // Admin can manually adjust stock if needed
+      }
+    }
   }
 
-  await updateDoc(doc(db, COLLECTIONS.ORDERS, orderId), updates);
+  // Update order status
+  const orderRef = doc(db, COLLECTIONS.ORDERS, orderId);
+  await updateDoc(orderRef, {
+    status: newStatus,
+    updatedAt: getCurrentTimestamp(),
+    ...(newStatus === OrderStatus.DELIVERED && { deliveredAt: getCurrentTimestamp() }),
+  });
+
+  console.log(`✅ Order status updated to ${newStatus}`);
 };
 
 /**
@@ -402,6 +479,21 @@ export const generateSubscriptionOrders = async (
           };
         })
       );
+
+      // Validate stock availability before creating order
+      const stockCheck = await checkStockAvailability(itemsWithPrices);
+      
+      if (!stockCheck.available) {
+        const insufficientList = stockCheck.insufficientItems
+          .map(item => `${item.productName} (Need: ${item.required}, Available: ${item.available})`)
+          .join(', ');
+        
+        errors.push(
+          `Subscription ${subscription.id.slice(0, 8)} - Insufficient stock: ${insufficientList}`
+        );
+        skipped++;
+        continue;
+      }
       
       // Calculate total
       const totalAmount = itemsWithPrices.reduce(
@@ -440,7 +532,21 @@ export const generateSubscriptionOrders = async (
         orderData.deliveryPartnerName = subscription.deliveryPartnerName;
       }
       
-      await addDoc(collection(db, COLLECTIONS.ORDERS), orderData);
+      const orderDocRef = await addDoc(collection(db, COLLECTIONS.ORDERS), orderData);
+      const orderId = orderDocRef.id;
+
+      // Reduce stock for the order
+      try {
+        await reduceStockForOrder(orderId, orderNumber, itemsWithPrices);
+        console.log(`✅ Stock reduced for subscription order ${orderNumber}`);
+      } catch (stockError: any) {
+        console.error('Stock reduction failed for subscription order:', stockError);
+        errors.push(
+          `Order ${orderNumber} - Stock reduction failed: ${stockError.message}`
+        );
+        // Order created but stock not reduced - admin needs to handle manually
+        // Send system notification to admin
+      }
       
       created++;
       console.log(`✅ Created order for subscription ${subscription.id}`);

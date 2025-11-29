@@ -13,7 +13,11 @@ import {
   ProductUnit,
   formatCurrency,
   formatDate,
+  getProductEmoji,
 } from '@ecommerce/shared';
+import { useAuth } from '@/contexts/AuthContext';
+import AddStockModal from '@/components/inventory/AddStockModal';
+import AdjustStockModal from '@/components/inventory/AdjustStockModal';
 import { showToast } from '@/lib/toast';
 
 export default function ProductDetailPage({ params }: { params: { id: string } }) {
@@ -27,6 +31,11 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
 
+  const [showAddStockModal, setShowAddStockModal] = useState(false);
+  const [showAdjustStockModal, setShowAdjustStockModal] = useState(false);
+
+  const { user } = useAuth();
+
   // Form state
   const [formData, setFormData] = useState({
     name: '',
@@ -38,6 +47,8 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
     price: 0,
     unit: ProductUnit.LITER,
     quantity: 0,
+    availableStock: 0,
+    lowStockThreshold: 20, // default value
     inStock: true,
     allowSubscription: false,
   });
@@ -61,6 +72,8 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
           price: data.price,
           unit: data.unit,
           quantity: data.quantity,
+          availableStock: data.availableStock,
+          lowStockThreshold: data.lowStockThreshold,
           inStock: data.inStock,
           allowSubscription: data.allowSubscription,
         });
@@ -285,7 +298,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
         
         <div className="flex items-start justify-between mt-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">{product.name}</h1>
+            <h1 className="text-3xl font-bold text-gray-900">{product.name} ({product.quantity} {product.unit})</h1>
             <p className="text-gray-600 mt-2">
               Added on {formatDate(product.createdAt)}
             </p>
@@ -330,6 +343,8 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                       price: product.price,
                       unit: product.unit,
                       quantity: product.quantity,
+                      availableStock: product.availableStock,
+                      lowStockThreshold: product.lowStockThreshold,
                       inStock: product.inStock,
                       allowSubscription: product.allowSubscription,
                     });
@@ -555,13 +570,57 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                 </div>
               </div>
 
+              {/* Stock Management */}
+              <div className="card">
+                <h2 className="text-lg font-bold text-gray-900 mb-4">
+                  📦 Stock Settings
+                </h2>
+                <div className="space-y-4">
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                    <p className="text-sm text-yellow-800">
+                      ℹ️ <strong>Note:</strong> To add or adjust stock quantities, use the "Add Stock" or "Manual Adjustment" buttons.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="label">Current Available Stock</label>
+                    <div className="input bg-gray-100" style={{ cursor: 'not-allowed' }}>
+                      {product.availableStock} units
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Stock quantity cannot be edited directly. Use "Add Stock" or "Manual Adjustment" buttons.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="label">Low Stock Threshold *</label>
+                    <input
+                      type="number"
+                      className="input"
+                      placeholder="e.g., 20"
+                      value={formData.lowStockThreshold || ''}
+                      onChange={(e) => setFormData({ 
+                        ...formData, 
+                        lowStockThreshold: parseInt(e.target.value) || 0 
+                      })}
+                      min="0"
+                      step="1"
+                      required
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      You'll get an alert when stock falls below this level
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               {/* Options */}
               <div className="card">
                 <h2 className="text-lg font-bold text-gray-900 mb-4">
                   ⚙️ Product Options
                 </h2>
                 <div className="space-y-4">
-                  <label className="flex items-center gap-3 cursor-pointer">
+                  {/* <label className="flex items-center gap-3 cursor-pointer">
                     <input
                       type="checkbox"
                       className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
@@ -572,7 +631,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                       <p className="font-medium text-gray-900">In Stock</p>
                       <p className="text-sm text-gray-600">Product is available for purchase</p>
                     </div>
-                  </label>
+                  </label> */}
 
                   <label className="flex items-center gap-3 cursor-pointer">
                     <input
@@ -602,7 +661,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                       className="w-full h-full object-cover rounded-lg"
                     />
                   ) : (
-                    <div className="text-8xl">📦</div>
+                    <div className="text-8xl">{getProductEmoji(product.category)}</div>
                   )}
                 </div>
               </div>
@@ -679,40 +738,83 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
         <div className="space-y-6">
           {!editing && (
             <>
-              {/* Stock Status */}
+              {/* Stock Management */}
               <div className="card">
                 <h2 className="text-lg font-bold text-gray-900 mb-4">
-                  📊 Stock Status
+                  📦 Stock Management
                 </h2>
+                
+                {/* Current Stock Display */}
                 <div className={`p-4 rounded-lg border-2 mb-4 ${
-                  product.inStock
-                    ? 'bg-green-50 border-green-200'
-                    : 'bg-red-50 border-red-200'
+                  product.availableStock === 0
+                    ? 'bg-red-50 border-red-200'
+                    : product.availableStock <= product.lowStockThreshold
+                    ? 'bg-yellow-50 border-yellow-200'
+                    : 'bg-green-50 border-green-200'
                 }`}>
                   <div className="text-center">
                     <div className="text-4xl mb-2">
-                      {product.inStock ? '✅' : '❌'}
+                      {product.availableStock === 0 ? '❌' :
+                      product.availableStock <= product.lowStockThreshold ? '⚠️' : '✅'}
                     </div>
-                    <p className={`font-semibold ${
-                      product.inStock ? 'text-green-900' : 'text-red-900'
+                    <p className="text-sm text-gray-600 mb-1">Available Stock</p>
+                    <p className={`text-3xl font-bold ${
+                      product.availableStock === 0 ? 'text-red-900' :
+                      product.availableStock <= product.lowStockThreshold ? 'text-yellow-900' :
+                      'text-green-900'
                     }`}>
-                      {product.inStock ? 'In Stock' : 'Out of Stock'}
+                      {product.availableStock}
                     </p>
+                    <p className="text-xs text-gray-600 mt-1">units</p>
                   </div>
                 </div>
-                <button
-                  onClick={handleToggleStock}
-                  disabled={saving}
-                  className={`w-full ${
-                    product.inStock ? 'btn-danger' : 'btn-primary'
-                  }`}
-                >
-                  {saving
-                    ? 'Updating...'
-                    : product.inStock
-                    ? '❌ Mark Out of Stock'
-                    : '✅ Mark In Stock'}
-                </button>
+
+                {/* Low Stock Warning */}
+                {product.availableStock > 0 && product.availableStock <= product.lowStockThreshold && (
+                  <div className="bg-yellow-100 border border-yellow-300 rounded-lg p-3 mb-4">
+                    <p className="text-sm text-yellow-800 font-medium">
+                      ⚠️ Low Stock Alert
+                    </p>
+                    <p className="text-xs text-yellow-700 mt-1">
+                      Stock is below threshold of {product.lowStockThreshold} units
+                    </p>
+                  </div>
+                )}
+
+                {/* Threshold Info */}
+                <div className="flex justify-between items-center mb-4 p-3 bg-gray-50 rounded-lg">
+                  <span className="text-sm text-gray-600">Low Stock Threshold</span>
+                  <span className="font-semibold text-gray-900">
+                    {product.lowStockThreshold} units
+                  </span>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="space-y-2">
+                  <button
+                    onClick={() => setShowAddStockModal(true)}
+                    className="btn-primary w-full flex items-center justify-center gap-2"
+                  >
+                    <span>➕</span>
+                    <span>Add Stock</span>
+                  </button>
+
+                  <button
+                    onClick={() => setShowAdjustStockModal(true)}
+                    className="btn-secondary w-full flex items-center justify-center gap-2"
+                  >
+                    <span>⚙️</span>
+                    <span>Manual Adjustment</span>
+                  </button>
+
+                  <Link
+                    href={`/dashboard/inventory/${product.id}/movements`}
+                    className="btn-secondary w-full flex items-center justify-center gap-2"
+                  >
+                    <span>📊</span>
+                    <span>View Stock History</span>
+                  </Link>
+                </div>
               </div>
 
               {/* Product Options */}
@@ -764,6 +866,31 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
           )}
         </div>
       </div>
+
+      {/* Add Stock Modal */}
+      <AddStockModal
+        isOpen={showAddStockModal}
+        onClose={() => setShowAddStockModal(false)}
+        productId={product.id}
+        productName={product.name}
+        currentStock={product.availableStock || 0}
+        adminId={user?.id || ''}
+        adminName={user?.name || 'Admin'}
+        onSuccess={loadProduct}
+      />
+
+      {/* Adjust Stock Modal */}
+      <AdjustStockModal
+        isOpen={showAdjustStockModal}
+        onClose={() => setShowAdjustStockModal(false)}
+        productId={product.id}
+        productName={product.name}
+        currentStock={product.availableStock || 0}
+        adminId={user?.id || ''}
+        adminName={user?.name || 'Admin'}
+        onSuccess={loadProduct}
+      />
+
     </div>
   );
 }

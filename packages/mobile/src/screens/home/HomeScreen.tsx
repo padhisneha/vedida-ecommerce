@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
   TextInput,
 } from 'react-native';
-import { Product, getInStockProducts, formatCurrency, ProductCategory, useAuthStore, getUnreadCount } from '@ecommerce/shared';
+import { Product, getInStockProducts, formatCurrency, ProductCategory, useAuthStore, getUnreadCount, getProductEmoji } from '@ecommerce/shared';
 
 export const HomeScreen = ({ navigation }: any) => {
   const { user } = useAuthStore(); // ADD THIS
@@ -89,22 +89,6 @@ export const HomeScreen = ({ navigation }: any) => {
     { value: ProductCategory.PANEER, label: 'Paneer', icon: '🧀' },
     { value: ProductCategory.BUTTER, label: 'Butter', icon: '🧈' },
   ];
-
-  const getProductEmoji = (category: string) => {
-    if (!category) return '📦';
-    
-    const emojis: Record<string, string> = {
-        milk: '🥛',
-        ghee: '🧈',
-        paneer: '🧀',
-        curd: '🥣',
-        butter: '🧈',
-        cheese: '🧀',
-    };
-    
-    const key = category.toLowerCase();
-    return emojis[key] || '📦';
-  };
 
   const renderProduct = ({ item }: { item: Product }) => (
     <TouchableOpacity

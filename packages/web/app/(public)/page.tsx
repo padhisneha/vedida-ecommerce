@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { initializeApp } from '@/lib/firebase';
-import { getActiveOffers, getAllProducts, Offer, Product } from '@ecommerce/shared';
+import { getActiveOffers, getAllProducts, Offer, Product, getProductEmoji } from '@ecommerce/shared';
 import { ShoppingBag, Smartphone, Mail } from 'lucide-react';
 import { Facebook, Instagram, Twitter, Linkedin, Youtube, X } from 'lucide-react';
 import Link from 'next/link';
@@ -268,23 +268,7 @@ export default function HomePage() {
     return () => clearInterval(timer);
   }, []);
 
-  const getProductEmoji = (category: string) => {
-    if (!category) return '📦';
-    
-    const emojis: Record<string, string> = {
-        milk: '🥛',
-        ghee: '🧈',
-        paneer: '🧀',
-        curd: '🥣',
-        butter: '🧈',
-        cheese: '🧀',
-    };
-    
-    const key = category.toLowerCase();
-    return emojis[key] || '📦';
-  };
-
-    // Helper to format product for display
+  // Helper to format product for display
   const formatProductForDisplay = (product: any) => {
     return {
         id: product.id,

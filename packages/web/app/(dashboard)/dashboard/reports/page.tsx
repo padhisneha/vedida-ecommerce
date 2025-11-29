@@ -66,11 +66,20 @@ export default function ReportsPage() {
   };
 
   const getProductWiseSales = () => {
+
+    // productMap.set(productKey, {
+    //         name: product.name,
+    //         productQuantity: product.quantity,
+    //         ProductUnit: product.unit,
+    //         quantity: existing.quantity + item.quantity
+    //       });
+
     const productMap = new Map<string, { 
       name: string; 
       quantity: number; 
       revenue: number;
-      unit: string;
+      productQuantity: number;
+      productUnit: string;
     }>();
 
     getOrdersInRange()
@@ -84,14 +93,16 @@ export default function ReportsPage() {
               name: productName, 
               quantity: 0, 
               revenue: 0,
-              unit: item.product.unit,
+              productQuantity: item.product.quantity,
+              productUnit: item.product.unit,
             };
             
             productMap.set(productKey, {
               name: productName,
               quantity: existing.quantity + item.quantity,
               revenue: existing.revenue + (item.price * item.quantity),
-              unit: item.product.unit,
+              productQuantity: item.product.quantity,
+              productUnit: item.product.unit,
             });
           }
         });
@@ -283,7 +294,7 @@ export default function ReportsPage() {
                   <div className="flex-1">
                     <p className="font-medium text-gray-900">{product.name}</p>
                     <p className="text-xs text-gray-500">
-                      {product.quantity} {product.unit} sold
+                      {product.productQuantity} {product.productUnit} - {product.quantity} sold
                     </p>
                   </div>
                   <div className="text-right">
@@ -335,7 +346,7 @@ export default function ReportsPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="font-medium text-gray-900">{product.name}</div>
-                      <div className="text-xs text-gray-500">{product.unit}</div>
+                      <div className="text-xs text-gray-500">{product.productQuantity} {product.productUnit}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       <div className="font-semibold text-gray-900">

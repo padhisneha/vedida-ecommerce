@@ -45,6 +45,7 @@ import {
   getDeliverySlotLabel,
   DELIVERY_SLOT_ICONS,
   DeliveryArea,
+  checkStockAvailability,
 } from '@ecommerce/shared';
 import { showToast } from '../../utils/toast';
 
@@ -446,6 +447,37 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
       return;
     }
 
+    // Validate stock availability
+    setLoading(true);
+    try {
+      const stockCheck = await checkStockAvailability(
+        cartItems.map(item => ({
+          productId: item.productId,
+          quantity: item.quantity,
+        }))
+      );
+      
+      if (!stockCheck.available) {
+        setLoading(false);
+        
+        const insufficientItems = stockCheck.insufficientItems
+          .map(item => `${item.productName}: Need ${item.required}, Only ${item.available} available`)
+          .join('\n');
+        
+        Alert.alert(
+          'Insufficient Stock',
+          `Some items in your cart are out of stock or low:\n\n${insufficientItems}\n\nPlease update your cart quantities.`,
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+    } catch (error) {
+      setLoading(false);
+      console.error('Error checking stock:', error);
+      showToast.error('Failed to verify stock availability');
+      return;
+    }
+
     // Handle UPI QR payment flow
     if (paymentMethod === PaymentMethod.UPI) {
       const tempOrderId = `TEMP-${Date.now()}`;
@@ -514,9 +546,15 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
           ]
         );
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error placing order:', error);
-      showToast.error('Failed to place order. Please try again.');
+
+      // Check if it's a stock error
+      if (error.message?.includes('Insufficient stock')) {
+        showToast.error('Some items are out of stock. Please refresh and try again.');
+      } else {
+        showToast.error('Failed to place order. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

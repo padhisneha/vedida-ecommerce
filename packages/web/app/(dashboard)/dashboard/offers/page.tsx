@@ -11,6 +11,7 @@ import {
   formatDate,
   ProductCategory,
   OfferApplicability,
+  getProductEmoji,
 } from '@ecommerce/shared';
 import { showToast } from '@/lib/toast';
 import { off } from 'process';
@@ -198,20 +199,6 @@ export default function OffersManagementPage() {
     { bg: '#E0E7FF', text: '#3730A3', name: 'Indigo' },
     { bg: '#FED7AA', text: '#9A3412', name: 'Orange' },
   ];
-
-  const getProductEmoji = (category: string) => {
-    const emojis: Record<string, string> = {
-        milk: '🥛',
-        ghee: '🧈',
-        paneer: '🧀',
-        curd: '🥣',
-        butter: '🧈',
-        cheese: '🧀',
-    };
-    
-    const key = category.toLowerCase();
-    return emojis[key] || '📦';
-  };
 
   if (loading) {
     return (

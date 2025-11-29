@@ -76,10 +76,35 @@ export interface Product {
   unit: ProductUnit;
   quantity: number; // e.g., 500 for 500ml
   imageUrl?: string;
-  inStock: boolean;
+  availableStock: number;        // Current stock in units
+  lowStockThreshold: number;     // Alert when stock falls below this
+  inStock: boolean;              // Auto-calculated based on availableStock > 0
   allowSubscription: boolean; // Can this product be subscribed?
   createdAt: Timestamp;
   updatedAt: Timestamp;
+}
+
+// Stock Movement tracking
+export interface StockMovement {
+  id: string;
+  productId: string;
+  productName: string;
+  type: StockMovementType;
+  quantity: number;              // Positive for IN, negative for OUT
+  previousStock: number;
+  newStock: number;
+  reason: string;
+  referenceId?: string;          // orderId or subscriptionId
+  referenceType?: 'order' | 'subscription' | 'manual';
+  createdBy: string;             // userId of the admin/operator
+  createdByName?: string;
+  createdAt: Timestamp;
+}
+
+export enum StockMovementType {
+  IN = 'in',
+  OUT = 'out',
+  ADJUSTMENT = 'adjustment',
 }
 
 // ============================================================================

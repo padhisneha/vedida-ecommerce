@@ -159,3 +159,20 @@ export const getSubscriptionProducts = async (): Promise<Product[]> => {
     ...doc.data(),
   })) as Product[];
 };
+
+export const getProductEmoji = (category: string) => {
+  if (!category) return '📦';
+  
+  const emojis: Record<string, string> = {
+      milk: '🥛',
+      ghee: '🧈',
+      paneer: '🧀',
+      curd: '🥣',
+      butter: '🧈',
+      cheese: '🧀',
+      buttermilk: '🥤',
+  };
+  
+  const key = category.toLowerCase();
+  return emojis[key] || '📦';
+};

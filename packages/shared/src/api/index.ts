@@ -10,3 +10,4 @@ export * from './storage';
 export * from './delivery-partners';
 export * from './offers';
 export * from './delivery-slots';
+export * from './stock';

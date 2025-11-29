@@ -8,6 +8,7 @@ import {
   Product,
   ProductCategory,
   formatCurrency,
+  getProductEmoji,
 } from '@ecommerce/shared';
 import { showToast } from '@/lib/toast';
 
@@ -16,7 +17,7 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<ProductCategory | 'all'>('all');
-  const [stockFilter, setStockFilter] = useState<'all' | 'in_stock' | 'out_of_stock'>('all');
+  const [stockFilter, setStockFilter] = useState<'all' | 'in_stock' | 'low_stock'| 'out_of_stock'>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12;
 
@@ -58,9 +59,11 @@ export default function InventoryPage() {
 
     // Filter by stock status
     if (stockFilter === 'in_stock') {
-      filtered = filtered.filter((product) => product.inStock);
+      filtered = filtered.filter((product) => product.availableStock > 0);
+    } else if (stockFilter === 'low_stock') {
+      filtered = filtered.filter((product) => product.availableStock > 0 && product.availableStock <= product.lowStockThreshold);
     } else if (stockFilter === 'out_of_stock') {
-      filtered = filtered.filter((product) => !product.inStock);
+      filtered = filtered.filter((product) => product.availableStock <= 0);
     }
 
     // Sort by name
@@ -80,9 +83,16 @@ export default function InventoryPage() {
     return Math.ceil(getFilteredProducts().length / itemsPerPage);
   };
 
+  const getInStockProducts = () => {
+    return products.filter((p) => p.availableStock > 0).length;
+  };
+
   const getLowStockProducts = () => {
-    // For now, consider products with inStock=false as low stock
-    return products.filter((p) => !p.inStock).length;
+    return products.filter((p) => p.availableStock > 0 && p.availableStock <= p.lowStockThreshold).length;
+  };
+
+  const getOutOfStockProducts = () => {
+    return products.filter((p) => p.availableStock === 0).length;
   };
 
   const getSubscriptionProducts = () => {
@@ -93,20 +103,6 @@ export default function InventoryPage() {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, categoryFilter, stockFilter]);
-
-  const getProductEmoji = (category: string) => {
-    const emojis: Record<string, string> = {
-        milk: '🥛',
-        ghee: '🧈',
-        paneer: '🧀',
-        curd: '🥣',
-        butter: '🧈',
-        cheese: '🧀',
-    };
-    
-    const key = category.toLowerCase();
-    return emojis[key] || '📦';
-  };
 
   const paginatedProducts = getPaginatedProducts();
   const totalPages = getTotalPages();
@@ -138,7 +134,7 @@ export default function InventoryPage() {
       </div>
 
       {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div className="flex items-center justify-between">
             <div>
@@ -156,22 +152,34 @@ export default function InventoryPage() {
             <div>
               <p className="text-sm font-medium text-green-800">In Stock</p>
               <p className="text-3xl font-bold text-green-900 mt-1">
-                {products.filter((p) => p.inStock).length}
+                {getInStockProducts()}
               </p>
             </div>
             <div className="text-4xl">✅</div>
           </div>
         </div>
 
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-red-800">Low Stock Alert</p>
-              <p className="text-3xl font-bold text-red-900 mt-1">
+              <p className="text-sm font-medium text-yellow-800">Low Stock Alert</p>
+              <p className="text-3xl font-bold text-yellow-900 mt-1">
                 {getLowStockProducts()}
               </p>
             </div>
             <div className="text-4xl">⚠️</div>
+          </div>
+        </div>
+
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-red-800">Out of Stock</p>
+              <p className="text-3xl font-bold text-red-900 mt-1">
+                {getOutOfStockProducts()}
+              </p>
+            </div>
+            <div className="text-4xl">❌</div>
           </div>
         </div>
 
@@ -234,11 +242,12 @@ export default function InventoryPage() {
         <select
           className="input w-full sm:w-48"
           value={stockFilter}
-          onChange={(e) => setStockFilter(e.target.value as 'all' | 'in_stock' | 'out_of_stock')}
+          onChange={(e) => setStockFilter(e.target.value as 'all' | 'in_stock' | 'low_stock' | 'out_of_stock')}
         >
           <option value="all">All Stock Status</option>
-          <option value="in_stock">In Stock</option>
-          <option value="out_of_stock">Out of Stock</option>
+          <option value="in_stock">✅ In Stock</option>
+          <option value="low_stock">⚠️ Low Stock</option>
+          <option value="out_of_stock">❌ Out of Stock</option>
         </select>
       </div>
 
@@ -292,11 +301,16 @@ export default function InventoryPage() {
                   ) : (
                     <div className="text-6xl"> {getProductEmoji(product.category)}</div>
                   )}
-                  {!product.inStock && (
+                  {/* Stock Badges - UPDATE THIS SECTION */}
+                  {product.availableStock === 0 ? (
                     <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full font-semibold">
                       Out of Stock
                     </div>
-                  )}
+                  ) : product.availableStock <= product.lowStockThreshold ? (
+                    <div className="absolute top-2 right-2 bg-yellow-500 text-white text-xs px-2 py-1 rounded-full font-semibold">
+                      ⚠️ Low Stock
+                    </div>
+                  ) : null}
                   {product.allowSubscription && (
                     <div className="absolute top-2 left-2 bg-purple-500 text-white text-xs px-2 py-1 rounded-full font-semibold">
                       📅 Subscription
@@ -316,24 +330,36 @@ export default function InventoryPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-2xl font-bold text-primary-600">
-                        {formatCurrency(product.price)}
+                        {formatCurrency(product.price)} &nbsp;&nbsp;
+                        {(product.taxCGST > 0 || product.taxSGST > 0) && (
+                          <span className="mt-2 text-xs text-gray-500">
+                            Incl. {product.taxCGST + product.taxSGST}% GST
+                          </span>
+                        )}
                       </p>
                       <p className="text-xs text-gray-500">
-                        per {product.quantity} {product.unit}
+                        &nbsp;
                       </p>
                     </div>
                     <div className="text-right">
                       <span className="text-xs uppercase font-semibold text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                        {product.category}
+                        {product.quantity} {product.unit}
                       </span>
                     </div>
                   </div>
 
-                  {(product.taxCGST > 0 || product.taxSGST > 0) && (
-                    <div className="mt-2 text-xs text-gray-500">
-                      Incl. {product.taxCGST + product.taxSGST}% GST
-                    </div>
-                  )}
+                  {/* Stock Info Bar */}
+                  <div className="flex items-center justify-between pt-3 border-t border-gray-200">
+                    <span className="text-xs text-gray-600">In Stock:</span>
+                    <span className={`text-xs font-semibold ${
+                      product.availableStock === 0 ? 'text-red-600' :
+                      product.availableStock <= product.lowStockThreshold ? 'text-yellow-600' :
+                      'text-green-600'
+                    }`}>
+                      {product.availableStock} units
+                    </span>
+                  </div>
+
                 </div>
               </Link>
             ))}

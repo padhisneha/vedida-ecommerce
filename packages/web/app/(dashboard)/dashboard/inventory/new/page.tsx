@@ -11,7 +11,9 @@ import {
   formatCurrency,
   uploadImage,
   generateProductImagePath,
+  addStock,
 } from '@ecommerce/shared';
+import { useAuth } from '@/contexts/AuthContext';
 import { showToast } from '@/lib/toast';
 
 export default function NewProductPage() {
@@ -19,6 +21,8 @@ export default function NewProductPage() {
   const [saving, setSaving] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  const { user, isAuthenticated, isLoading, isAdmin } = useAuth();
 
   const [formData, setFormData] = useState({
     name: '',
@@ -29,6 +33,8 @@ export default function NewProductPage() {
     taxSGST: 0,
     unit: ProductUnit.LITER,
     quantity: 1,
+    availableStock: 0,
+    lowStockThreshold: 20,
     inStock: true,
     allowSubscription: false,
   });
@@ -84,6 +90,16 @@ export default function NewProductPage() {
       return;
     }
 
+    if (formData.availableStock < 0) {
+      showToast.error('Available stock cannot be negative');
+      return;
+    }
+
+    if (formData.lowStockThreshold < 0) {
+      showToast.error('Low stock threshold cannot be negative');
+      return;
+    }
+
     setSaving(true);
     const toastId = showToast.loading('Creating product...');
     
@@ -101,13 +117,27 @@ export default function NewProductPage() {
         price: calculatedPrice,
         unit: formData.unit,
         quantity: formData.quantity,
-        inStock: formData.inStock,
+        availableStock: formData.availableStock,
+        lowStockThreshold: formData.lowStockThreshold,
+        inStock: formData.availableStock > 0,
         allowSubscription: formData.allowSubscription,
       });
 
+      // If initial stock > 0, record it in stock movements
+      if (formData.availableStock > 0) {
+                
+        await addStock(
+          productId,
+          formData.availableStock,
+          user?.id || 'admin',
+          user?.name || 'Admin',
+          'Initial stock'
+        );
+      }
+
       // Upload image if selected
       if (imageFile) {
-        showToast.loading('Uploading product image...', { id: toastId });
+        showToast.loading('Uploading product image...');
         
         try {
           const path = generateProductImagePath(productId, imageFile.name);
@@ -371,13 +401,82 @@ export default function NewProductPage() {
               </div>
             </div>
 
+            {/* Stock Management */}
+            <div className="card">
+              <h2 className="text-lg font-bold text-gray-900 mb-4">
+                📦 Stock Management
+              </h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="label">Initial Stock *</label>
+                  <input
+                    type="number"
+                    className="input"
+                    placeholder="e.g., 100"
+                    value={formData.availableStock || ''}
+                    onChange={(e) => setFormData({ 
+                      ...formData, 
+                      availableStock: parseInt(e.target.value) || 0,
+                      inStock: (parseInt(e.target.value) || 0) > 0  // Auto-update inStock
+                    })}
+                    min="0"
+                    step="1"
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Number of units currently available in stock
+                  </p>
+                </div>
+
+                <div>
+                  <label className="label">Low Stock Threshold *</label>
+                  <input
+                    type="number"
+                    className="input"
+                    placeholder="e.g., 20"
+                    value={formData.lowStockThreshold || ''}
+                    onChange={(e) => setFormData({ 
+                      ...formData, 
+                      lowStockThreshold: parseInt(e.target.value) || 0 
+                    })}
+                    min="0"
+                    step="1"
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    You'll get an alert when stock falls below this level
+                  </p>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-sm text-blue-800">
+                    💡 <strong>Stock Status:</strong> {' '}
+                    {formData.availableStock > 0 ? (
+                      <span className="text-green-700 font-semibold">
+                        ✅ In Stock ({formData.availableStock} units)
+                      </span>
+                    ) : (
+                      <span className="text-red-700 font-semibold">
+                        ❌ Out of Stock
+                      </span>
+                    )}
+                  </p>
+                  {formData.availableStock > 0 && formData.availableStock <= formData.lowStockThreshold && (
+                    <p className="text-sm text-yellow-700 mt-1">
+                      ⚠️ Stock is below threshold - Consider restocking soon
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* Product Options */}
             <div className="card">
               <h2 className="text-lg font-bold text-gray-900 mb-4">
                 ⚙️ Product Options
               </h2>
               <div className="space-y-4">
-                <label className="flex items-start gap-3 cursor-pointer p-3 rounded-lg hover:bg-gray-50 transition-colors">
+                {/* <label className="flex items-start gap-3 cursor-pointer p-3 rounded-lg hover:bg-gray-50 transition-colors">
                   <input
                     type="checkbox"
                     className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500 mt-0.5"
@@ -388,7 +487,7 @@ export default function NewProductPage() {
                     <p className="font-medium text-gray-900">In Stock</p>
                     <p className="text-sm text-gray-600">Product is available for purchase</p>
                   </div>
-                </label>
+                </label> */}
 
                 <label className="flex items-start gap-3 cursor-pointer p-3 rounded-lg hover:bg-gray-50 transition-colors">
                   <input
