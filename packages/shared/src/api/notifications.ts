@@ -13,10 +13,7 @@ import {
 } from 'firebase/firestore';
 import { getFirebaseFirestore } from './firebase-config';
 import { Notification, NotificationType } from '../types/notifications';
-
-const COLLECTIONS = {
-  NOTIFICATIONS: 'notifications',
-};
+import { COLLECTIONS } from '../types';
 
 /**
  * Create a notification

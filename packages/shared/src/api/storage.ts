@@ -65,3 +65,44 @@ export const generateProductImagePath = (productId: string, filename: string): s
   const timestamp = Date.now();
   return `products/${productId}_${timestamp}.${extension}`;
 };
+
+/**
+ * Generate banner image path
+ */
+export const generateBannerImagePath = (bannerId: string, fileName: string): string => {
+  const timestamp = Date.now();
+  const extension = fileName.split('.').pop();
+  return `banners/${bannerId}/banner_${timestamp}.${extension}`;
+};
+
+/**
+ * Upload banner image
+ */
+export const uploadBannerImage = async (
+  file: File,
+  path: string
+): Promise<string> => {
+  const storage = getFirebaseStorage();
+  const storageRef = ref(storage, path);
+  
+  await uploadBytes(storageRef, file);
+  const downloadURL = await getDownloadURL(storageRef);
+  
+  console.log('✅ Banner image uploaded:', downloadURL);
+  return downloadURL;
+};
+
+/**
+ * Delete banner image
+ */
+export const deleteBannerImage = async (imageUrl: string): Promise<void> => {
+  try {
+    const storage = getFirebaseStorage();
+    const imageRef = ref(storage, imageUrl);
+    await deleteObject(imageRef);
+    console.log('✅ Banner image deleted');
+  } catch (error) {
+    console.error('Error deleting banner image:', error);
+    // Don't throw - image might already be deleted
+  }
+};

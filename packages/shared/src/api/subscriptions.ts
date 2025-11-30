@@ -405,7 +405,7 @@ export const updateSubscriptionDeliverySlot = async (
 ): Promise<void> => {
   const db = getFirebaseFirestore();
   try {
-    const subscriptionRef = doc(db, 'subscriptions', subscriptionId);
+    const subscriptionRef = doc(db, COLLECTIONS.SUBSCRIPTIONS, subscriptionId);
     
     await updateDoc(subscriptionRef, {
       deliverySlot,

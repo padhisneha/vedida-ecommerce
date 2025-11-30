@@ -298,9 +298,16 @@ export const COLLECTIONS = {
   SUBSCRIPTIONS: 'subscriptions',
   ORDERS: 'orders',
   DELIVERY_SLOT_CONFIGS: 'deliverySlotConfigs',
+  OFFERS: 'offers',
+  DELIVERY_AREAS: 'deliveryAreas',
+  NOTIFICATIONS: 'notifications',
+  STOCK_MOVEMENTS: 'stockMovements',
+  SETTINGS: 'settings',
+  BANNERS: 'banners',
 } as const;
 
 
 export * from './settings';
 export * from './notifications';
 export * from './offers';
+export * from './banners';

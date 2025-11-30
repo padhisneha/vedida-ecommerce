@@ -78,6 +78,7 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
   const [selectedAddress, setSelectedAddress] = useState<UserAddress | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.COD);
   const [loading, setLoading] = useState(false);
+  const [submittingUPI, setSubmittingUPI] = useState(false);
 
   // Delivery Slot State
   const [deliveryArea, setDeliveryArea] = useState<DeliveryArea | null>(null);
@@ -644,7 +645,7 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
       return;
     }
 
-    setLoading(true);
+    setSubmittingUPI(true);
     setShowUPIModal(false);
 
     try {
@@ -677,7 +678,7 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
       console.error('Error creating subscription:', error);
       showToast.error('Failed to create subscription. Please try again.');
     } finally {
-      setLoading(false);
+      setSubmittingUPI(false);
       setUpiPaymentAcknowledged(false);
     }
   };
@@ -1323,12 +1324,12 @@ export const SubscriptionCheckoutScreen = ({ route, navigation }: any) => {
               <TouchableOpacity
                 style={[
                   styles.submitUPIButton,
-                  (!upiPaymentAcknowledged || loading) && styles.submitUPIButtonDisabled,
+                  (!upiPaymentAcknowledged || submittingUPI) && styles.submitUPIButtonDisabled,
                 ]}
                 onPress={handleUPIPaymentDone}
-                disabled={!upiPaymentAcknowledged || loading}
+                disabled={!upiPaymentAcknowledged || submittingUPI}
               >
-                {loading ? (
+                {submittingUPI ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
                   <Text style={styles.submitUPIButtonText}>

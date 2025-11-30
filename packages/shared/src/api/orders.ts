@@ -11,13 +11,14 @@ import {
   limit,
   Timestamp,
   or,
+  runTransaction,
 } from 'firebase/firestore';
 import { getFirebaseFirestore } from './firebase-config';
-import { Order, OrderStatus, OrderType, COLLECTIONS, PaymentStatus, DeliverySlot } from '../types';
+import { Order, OrderStatus, OrderType, COLLECTIONS, PaymentStatus, DeliverySlot, Product, StockMovementType } from '../types';
 import { DELIVERY_SLOT_LABELS } from '../constants';
 import { getCurrentTimestamp } from '../utils';
 import { getProductById } from './products';
-import { reduceStockForOrder, checkStockAvailability, restoreStockForOrder } from './stock';
+import { checkAndNotifyLowStock, checkStockAvailability } from './stock';
 
 /**
  * Generate order number
@@ -47,14 +48,15 @@ const generateOrderNumber = async (): Promise<string> => {
 };
 
 /**
- * Create a new order
+ * Create a new order with stock reduction in a single transaction
+ * Either both succeed or both fail
  */
 export const createOrder = async (
   orderData: Omit<Order, 'id' | 'orderNumber' | 'createdAt' | 'updatedAt'>
 ): Promise<string> => {
   const db = getFirebaseFirestore();
-
-  // STEP 1: Validate stock availability BEFORE creating order
+  
+  // STEP 1: Pre-validate stock availability (outside transaction)
   const stockCheck = await checkStockAvailability(orderData.items);
   
   if (!stockCheck.available) {
@@ -62,36 +64,208 @@ export const createOrder = async (
       .map(item => `${item.productName}: Need ${item.required}, Available ${item.available}`)
       .join(', ');
     
-    throw new Error(
-      `Insufficient stock for: ${insufficientList}`
+    throw new Error(`Insufficient stock for: ${insufficientList}`);
+  }
+
+  // STEP 2: Generate order number outside transaction
+  const orderNumber = await generateOrderNumber();
+  const timestamp = getCurrentTimestamp();
+
+  // STEP 3: Execute in TRANSACTION with proper read/write separation
+  let orderId: string = '';
+  
+  await runTransaction(db, async (transaction) => {
+    // PHASE 1: ALL READS FIRST
+    const productDocs = await Promise.all(
+      orderData.items.map(item => 
+        transaction.get(doc(db, COLLECTIONS.PRODUCTS, item.productId))
+      )
+    );
+
+    // Validate all products exist and have sufficient stock
+    const productsData: Array<{ product: Product; item: typeof orderData.items[0] }> = [];
+    
+    for (let i = 0; i < productDocs.length; i++) {
+      const productDoc = productDocs[i];
+      const item = orderData.items[i];
+
+      if (!productDoc.exists()) {
+        throw new Error(`Product ${item.productId} not found`);
+      }
+
+      const product = productDoc.data() as Product;
+      const availableStock = product.availableStock || 0;
+
+      // Double-check stock within transaction (race condition protection)
+      if (availableStock < item.quantity) {
+        throw new Error(
+          `Insufficient stock for ${product.name}. Available: ${availableStock}, Required: ${item.quantity}`
+        );
+      }
+
+      productsData.push({ product, item });
+    }
+
+    // PHASE 2: ALL WRITES AFTER ALL READS
+    
+    // Write 1: Create the order document
+    const orderRef = doc(collection(db, COLLECTIONS.ORDERS));
+    orderId = orderRef.id;
+    
+    const newOrder = {
+      ...orderData,
+      orderNumber,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    
+    transaction.set(orderRef, newOrder);
+
+    // Write 2: Update stock for each product
+    for (const { product, item } of productsData) {
+      const productRef = doc(db, COLLECTIONS.PRODUCTS, item.productId);
+      const previousStock = product.availableStock || 0;
+      const newStock = previousStock - item.quantity;
+
+      transaction.update(productRef, {
+        availableStock: newStock,
+        inStock: newStock > 0,
+        updatedAt: timestamp,
+      });
+
+      // Write 3: Create stock movement record
+      const movementRef = doc(collection(db, COLLECTIONS.STOCK_MOVEMENTS));
+      transaction.set(movementRef, {
+        productId: item.productId,
+        productName: product.name,
+        type: StockMovementType.OUT,
+        quantity: -item.quantity,
+        previousStock,
+        newStock,
+        reason: `Order ${orderNumber}`,
+        referenceId: orderId,
+        referenceType: 'order',
+        createdBy: 'system',
+        createdByName: 'System',
+        createdAt: timestamp,
+      });
+    }
+  });
+
+  // After transaction succeeds, check for low stock (non-blocking)
+  for (const item of orderData.items) {
+    checkAndNotifyLowStock(item.productId).catch(err => 
+      console.error('Low stock notification failed:', err)
     );
   }
 
-  // STEP 2: Create the order
-  const timestamp = getCurrentTimestamp();
-  const orderNumber = await generateOrderNumber();
-
-  const newOrder = {
-    ...orderData,
-    orderNumber,
-    createdAt: timestamp,
-    updatedAt: timestamp,
-  };
-
-  const docRef = await addDoc(collection(db, COLLECTIONS.ORDERS), newOrder);
-  const orderId = docRef.id;
-
-  // STEP 3: Reduce stock for all items
-  try {
-    await reduceStockForOrder(orderId, orderNumber, orderData.items);
-    console.log(`✅ Order created and stock reduced: ${orderNumber}`);
-  } catch (stockError) {
-    console.error('Stock reduction failed after order creation:', stockError);
-    // Order is created but stock not reduced - admin needs to handle manually
-    // Could implement compensation logic here if needed
-  }
-
+  console.log(`✅ Order created and stock reduced atomically: ${orderNumber}`);
   return orderId;
+};
+
+/**
+ * Cancel order and restore stock in a single transaction
+ */
+export const cancelOrder = async (
+  orderId: string,
+  adminId: string,
+  adminName: string,
+  reason: string = 'Order cancelled'
+): Promise<void> => {
+  const db = getFirebaseFirestore();
+  const timestamp = getCurrentTimestamp();
+
+  await runTransaction(db, async (transaction) => {
+    // PHASE 1: ALL READS FIRST
+    
+    // Read 1: Get order
+    const orderRef = doc(db, COLLECTIONS.ORDERS, orderId);
+    const orderDoc = await transaction.get(orderRef);
+
+    if (!orderDoc.exists()) {
+      throw new Error('Order not found');
+    }
+
+    const order = orderDoc.data() as Order;
+
+    // Validate
+    if (order.status === OrderStatus.DELIVERED) {
+      throw new Error('Cannot cancel delivered orders');
+    }
+
+    if (order.status === OrderStatus.CANCELLED) {
+      throw new Error('Order is already cancelled');
+    }
+
+    // Read 2: Get all products (only if we need to restore stock)
+    let productsData: Array<{ product: Product; item: typeof order.items[0] }> = [];
+    
+    if (
+      order.status === OrderStatus.PENDING ||
+      order.status === OrderStatus.CONFIRMED ||
+      order.status === OrderStatus.OUT_FOR_DELIVERY
+    ) {
+      const productDocs = await Promise.all(
+        order.items.map(item =>
+          transaction.get(doc(db, COLLECTIONS.PRODUCTS, item.productId))
+        )
+      );
+
+      for (let i = 0; i < productDocs.length; i++) {
+        const productDoc = productDocs[i];
+        const item = order.items[i];
+
+        if (productDoc.exists()) {
+          productsData.push({
+            product: productDoc.data() as Product,
+            item,
+          });
+        } else {
+          console.warn(`Product ${item.productId} not found during cancellation`);
+        }
+      }
+    }
+
+    // PHASE 2: ALL WRITES AFTER ALL READS
+    
+    // Write 1: Restore stock for each product
+    for (const { product, item } of productsData) {
+      const productRef = doc(db, COLLECTIONS.PRODUCTS, item.productId);
+      const previousStock = product.availableStock || 0;
+      const newStock = previousStock + item.quantity;
+
+      transaction.update(productRef, {
+        availableStock: newStock,
+        inStock: newStock > 0,
+        updatedAt: timestamp,
+      });
+
+      // Write 2: Create stock movement record
+      const movementRef = doc(collection(db, COLLECTIONS.STOCK_MOVEMENTS));
+      transaction.set(movementRef, {
+        productId: item.productId,
+        productName: product.name,
+        type: StockMovementType.IN,
+        quantity: item.quantity,
+        previousStock,
+        newStock,
+        reason: `Stock restored - ${reason}`,
+        referenceId: orderId,
+        referenceType: 'order',
+        createdBy: adminId,
+        createdByName: adminName,
+        createdAt: timestamp,
+      });
+    }
+
+    // Write 3: Update order status to cancelled
+    transaction.update(orderRef, {
+      status: OrderStatus.CANCELLED,
+      updatedAt: timestamp,
+    });
+  });
+
+  console.log(`✅ Order cancelled and stock restored atomically: ${orderId}`);
 };
 
 /**
@@ -271,66 +445,31 @@ export const getOrderByIdWithProducts = async (orderId: string): Promise<Order |
  */
 export const updateOrderStatus = async (
   orderId: string,
-  newStatus: OrderStatus
+  newStatus: OrderStatus,
+  adminId?: string,
+  adminName?: string
 ): Promise<void> => {
   const db = getFirebaseFirestore();
-
-  // If cancelling, need to restore stock
+  
+  // If cancelling, use the atomic cancelOrder function
   if (newStatus === OrderStatus.CANCELLED) {
-    // Get order details first
-    const orderRef = doc(db, COLLECTIONS.ORDERS, orderId);
-    const orderDoc = await getDoc(orderRef);
-    
-    if (!orderDoc.exists()) {
-      throw new Error('Order not found');
-    }
-    
-    const order = orderDoc.data() as Order;
-    
-    // Don't restore stock if already delivered
-    if (order.status === OrderStatus.DELIVERED) {
-      throw new Error('Cannot cancel delivered orders');
-    }
-    
-    // Only restore stock if order was confirmed (meaning stock was already reduced)
-    if (
-      order.status === OrderStatus.PENDING ||
-      order.status === OrderStatus.CONFIRMED ||
-      order.status === OrderStatus.OUT_FOR_DELIVERY
-    ) {
-      try {
-        // Prepare items with product names for better logging
-        const itemsWithNames = order.items.map(item => ({
-          productId: item.productId,
-          quantity: item.quantity,
-          productName: item.product?.name,
-        }));
-        
-        await restoreStockForOrder(
-          orderId,
-          order.orderNumber,
-          itemsWithNames,
-          'system',
-          'System'
-        );
-        
-        console.log(`✅ Stock restored for cancelled order ${order.orderNumber}`);
-      } catch (stockError) {
-        console.error('Stock restoration failed:', stockError);
-        // Still proceed with cancellation, but log the error
-        // Admin can manually adjust stock if needed
-      }
-    }
+    await cancelOrder(
+      orderId,
+      adminId || 'system',
+      adminName || 'System',
+      'Order cancelled by admin'
+    );
+    return;
   }
-
-  // Update order status
+  
+  // For other status updates, just update the order
   const orderRef = doc(db, COLLECTIONS.ORDERS, orderId);
   await updateDoc(orderRef, {
     status: newStatus,
     updatedAt: getCurrentTimestamp(),
     ...(newStatus === OrderStatus.DELIVERED && { deliveredAt: getCurrentTimestamp() }),
   });
-
+  
   console.log(`✅ Order status updated to ${newStatus}`);
 };
 
@@ -415,7 +554,6 @@ export const generateSubscriptionOrders = async (
 ): Promise<{ created: number; skipped: number; errors: string[] }> => {
   const db = getFirebaseFirestore();
   
-  // Get all active subscriptions
   const subsQuery = query(
     collection(db, COLLECTIONS.SUBSCRIPTIONS),
     where('status', '==', 'active')
@@ -429,23 +567,20 @@ export const generateSubscriptionOrders = async (
     const subscription = { id: subDoc.id, ...subDoc.data() } as any;
     
     try {
-      // Check if subscription should deliver on this date
+      // Existing validations
       const startDate = subscription.startDate.toDate();
       const endDate = subscription.endDate?.toDate();
       
-      // Skip if delivery date is before subscription start
       if (deliveryDate < startDate) {
         skipped++;
         continue;
       }
       
-      // Skip if delivery date is after subscription end
       if (endDate && deliveryDate > endDate) {
         skipped++;
         continue;
       }
       
-      // Check if subscription is paused
       if (subscription.pausedUntil) {
         const pausedUntil = subscription.pausedUntil.toDate();
         if (deliveryDate <= pausedUntil) {
@@ -454,21 +589,18 @@ export const generateSubscriptionOrders = async (
         }
       }
       
-      // Check if order already exists
       const exists = await checkSubscriptionOrderExists(subscription.id, deliveryDate);
       if (exists) {
-        console.log(`Order already exists for subscription ${subscription.id}`);
         skipped++;
         continue;
       }
       
-      // Check frequency
       if (!shouldDeliverToday(subscription, deliveryDate)) {
         skipped++;
         continue;
       }
       
-      // Get product details for pricing
+      // IMPORTANT: Get product details OUTSIDE transaction
       const itemsWithPrices = await Promise.all(
         subscription.items.map(async (item: any) => {
           const product = await getProductById(item.productId);
@@ -476,80 +608,152 @@ export const generateSubscriptionOrders = async (
             productId: item.productId,
             quantity: item.quantity,
             price: product?.price || 0,
+            productName: product?.name || 'Unknown',
           };
         })
       );
 
-      // Validate stock availability before creating order
+      // Pre-validate stock OUTSIDE transaction
       const stockCheck = await checkStockAvailability(itemsWithPrices);
-      
+
       if (!stockCheck.available) {
         const insufficientList = stockCheck.insufficientItems
           .map(item => `${item.productName} (Need: ${item.required}, Available: ${item.available})`)
           .join(', ');
         
         errors.push(
-          `Subscription ${subscription.id.slice(0, 8)} - Insufficient stock: ${insufficientList}`
+          `Sub ${subscription.id.slice(0, 8)} - Insufficient stock: ${insufficientList}`
         );
         skipped++;
         continue;
       }
-      
-      // Calculate total
+
       const totalAmount = itemsWithPrices.reduce(
         (sum, item) => sum + item.price * item.quantity,
         0
       );
-      
-      // Create order
+
+      // Generate order number OUTSIDE transaction
       const orderNumber = await generateOrderNumber();
       const timestamp = getCurrentTimestamp();
       const scheduledDelivery = new Date(deliveryDate);
       scheduledDelivery.setHours(7, 0, 0, 0);
-      
-      // Prepare order data
-      const orderData: any = {
-        orderNumber,
-        userId: subscription.userId,
-        type: 'subscription',
-        subscriptionId: subscription.id,
-        items: itemsWithPrices,
-        totalAmount,
-        deliveryAddress: subscription.deliveryAddress,
-        DeliverySlot: subscription.deliverySlot,
-        deliverySlotLabel: subscription.deliverySlotLabel,
-        status: 'pending',
-        scheduledDeliveryDate: Timestamp.fromDate(scheduledDelivery),
-        paymentMethod: subscription.paymentMethod,
-        paymentStatus: subscription.paymentStatus,
-        createdAt: timestamp,
-        updatedAt: timestamp,
-      };
-      
-      // Add delivery partner info if assigned to subscription
-      if (subscription.deliveryPartnerId && subscription.deliveryPartnerName) {
-        orderData.deliveryPartnerId = subscription.deliveryPartnerId;
-        orderData.deliveryPartnerName = subscription.deliveryPartnerName;
-      }
-      
-      const orderDocRef = await addDoc(collection(db, COLLECTIONS.ORDERS), orderData);
-      const orderId = orderDocRef.id;
 
-      // Reduce stock for the order
-      try {
-        await reduceStockForOrder(orderId, orderNumber, itemsWithPrices);
-        console.log(`✅ Stock reduced for subscription order ${orderNumber}`);
-      } catch (stockError: any) {
-        console.error('Stock reduction failed for subscription order:', stockError);
-        errors.push(
-          `Order ${orderNumber} - Stock reduction failed: ${stockError.message}`
+      // NOW: ATOMIC TRANSACTION with only transaction reads
+      let orderId: string = '';
+
+      await runTransaction(db, async (transaction) => {
+        // PHASE 1: ALL READS (only product stock validation)
+        const productRefs = itemsWithPrices.map(item => 
+          doc(db, COLLECTIONS.PRODUCTS, item.productId)
         );
-        // Order created but stock not reduced - admin needs to handle manually
-        // Send system notification to admin
+        
+        const productDocs = await Promise.all(
+          productRefs.map(ref => transaction.get(ref))
+        );
+
+        // Validate and collect product data
+        const productsData: Array<{ 
+          ref: any;
+          product: Product; 
+          item: typeof itemsWithPrices[0];
+        }> = [];
+        
+        for (let i = 0; i < productDocs.length; i++) {
+          const productDoc = productDocs[i];
+          const item = itemsWithPrices[i];
+
+          if (!productDoc.exists()) {
+            throw new Error(`Product ${item.productId} not found`);
+          }
+
+          const product = productDoc.data() as Product;
+          const availableStock = product.availableStock || 0;
+
+          // Re-check stock within transaction (race condition protection)
+          if (availableStock < item.quantity) {
+            throw new Error(
+              `Insufficient stock for ${product.name}. Available: ${availableStock}, Required: ${item.quantity}`
+            );
+          }
+
+          productsData.push({ 
+            ref: productRefs[i],
+            product, 
+            item 
+          });
+        }
+
+        // PHASE 2: ALL WRITES
+        
+        // Write 1: Create order
+        const orderRef = doc(collection(db, COLLECTIONS.ORDERS));
+        orderId = orderRef.id;
+        
+        const orderData: any = {
+          orderNumber,
+          userId: subscription.userId,
+          type: 'subscription',
+          subscriptionId: subscription.id,
+          items: itemsWithPrices.map(({ productName, ...item }) => item),
+          totalAmount,
+          deliveryAddress: subscription.deliveryAddress,
+          deliverySlot: subscription.deliverySlot,
+          deliverySlotLabel: subscription.deliverySlotLabel,
+          status: 'pending',
+          scheduledDeliveryDate: Timestamp.fromDate(scheduledDelivery),
+          paymentMethod: subscription.paymentMethod,
+          paymentStatus: subscription.paymentStatus,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        };
+        
+        if (subscription.deliveryPartnerId && subscription.deliveryPartnerName) {
+          orderData.deliveryPartnerId = subscription.deliveryPartnerId;
+          orderData.deliveryPartnerName = subscription.deliveryPartnerName;
+        }
+        
+        transaction.set(orderRef, orderData);
+
+        // Write 2: Update stock for each product
+        for (const { ref, product, item } of productsData) {
+          const previousStock = product.availableStock || 0;
+          const newStock = previousStock - item.quantity;
+
+          transaction.update(ref, {
+            availableStock: newStock,
+            inStock: newStock > 0,
+            updatedAt: timestamp,
+          });
+
+          // Write 3: Create stock movement
+          const movementRef = doc(collection(db, COLLECTIONS.STOCK_MOVEMENTS));
+          transaction.set(movementRef, {
+            productId: item.productId,
+            productName: product.name,
+            type: 'out',
+            quantity: -item.quantity,
+            previousStock,
+            newStock,
+            reason: `Subscription Order ${orderNumber}`,
+            referenceId: orderId,
+            referenceType: 'order',
+            createdBy: 'system',
+            createdByName: 'System',
+            createdAt: timestamp,
+          });
+        }
+      });
+
+      // After transaction, notify about low stock
+      for (const item of itemsWithPrices) {
+        checkAndNotifyLowStock(item.productId).catch(err => 
+          console.error('Low stock notification failed:', err)
+        );
       }
       
       created++;
-      console.log(`✅ Created order for subscription ${subscription.id}`);
+      console.log(`✅ Created subscription order ${orderNumber} atomically`);
     } catch (error: any) {
       console.error(`Error creating order for subscription ${subscription.id}:`, error);
       errors.push(`Subscription ${subscription.id.slice(0, 8)}: ${error.message}`);
@@ -684,7 +888,7 @@ export const updateOrderDeliverySlot = async (
 ): Promise<void> => {
   const db = getFirebaseFirestore();
   try {
-    const orderRef = doc(db, 'orders', orderId);
+    const orderRef = doc(db, COLLECTIONS.ORDERS, orderId);
     
     await updateDoc(orderRef, {
       deliverySlot,

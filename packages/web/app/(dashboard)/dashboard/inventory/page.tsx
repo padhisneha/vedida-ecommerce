@@ -9,6 +9,7 @@ import {
   ProductCategory,
   formatCurrency,
   getProductEmoji,
+  initialCapital,
 } from '@ecommerce/shared';
 import { showToast } from '@/lib/toast';
 
@@ -127,10 +128,16 @@ export default function InventoryPage() {
           <h1 className="text-3xl font-bold text-gray-900">Inventory Management</h1>
           <p className="text-gray-600 mt-2">Manage products and stock levels</p>
         </div>
-        <Link href="/dashboard/inventory/new" className="btn-primary flex items-center gap-2">
-          <span>➕</span>
-          <span>Add New Product</span>
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/dashboard/inventory/sync" className="btn-secondary flex items-center gap-2">
+            <span>🔄</span>
+            <span>Reconcile Stock</span>
+          </Link>
+          <Link href="/dashboard/inventory/new" className="btn-primary flex items-center gap-2">
+            <span>➕</span>
+            <span>Add New Product</span>
+          </Link>
+        </div>
       </div>
 
       {/* Stats Overview */}
@@ -229,13 +236,11 @@ export default function InventoryPage() {
           onChange={(e) => setCategoryFilter(e.target.value as ProductCategory | 'all')}
         >
           <option value="all">All Categories</option>
-          <option value={ProductCategory.MILK}>Milk</option>
-          <option value={ProductCategory.CURD}>Curd</option>
-          <option value={ProductCategory.GHEE}>Ghee</option>
-          <option value={ProductCategory.PANEER}>Paneer</option>
-          <option value={ProductCategory.BUTTER}>Butter</option>
-          <option value={ProductCategory.BUTTERMILK}>Buttermilk</option>
-          <option value={ProductCategory.OTHER}>Other</option>
+          {Object.values(ProductCategory).map((cat) => (
+            <option key={cat} value={cat}>
+                {initialCapital(cat).replace('_', ' ')}
+            </option>
+          ))}
         </select>
 
         {/* Stock Filter */}

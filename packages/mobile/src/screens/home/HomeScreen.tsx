@@ -9,7 +9,9 @@ import {
   ActivityIndicator,
   TextInput,
 } from 'react-native';
-import { Product, getInStockProducts, formatCurrency, ProductCategory, useAuthStore, getUnreadCount, getProductEmoji } from '@ecommerce/shared';
+import { Product, getInStockProducts, formatCurrency, ProductCategory, useAuthStore, getUnreadCount, getProductEmoji, initialCapital } from '@ecommerce/shared';
+import { BannerCarousel } from '../../components/BannerCarousel';
+import { PromoBanners } from '../../components/PromoBanners';
 
 export const HomeScreen = ({ navigation }: any) => {
   const { user } = useAuthStore(); // ADD THIS
@@ -82,12 +84,11 @@ export const HomeScreen = ({ navigation }: any) => {
   };
 
   const categories = [
-    { value: 'all' as const, label: 'All', icon: '🏪' },
-    { value: ProductCategory.MILK, label: 'Milk', icon: '🥛' },
-    { value: ProductCategory.CURD, label: 'Curd', icon: '🥣' },
-    { value: ProductCategory.GHEE, label: 'Ghee', icon: '🧈' },
-    { value: ProductCategory.PANEER, label: 'Paneer', icon: '🧀' },
-    { value: ProductCategory.BUTTER, label: 'Butter', icon: '🧈' },
+    { value: 'all' as const, label: 'All' },
+    ...Object.values(ProductCategory).map((cat) => ({
+      value: cat,
+      label: initialCapital(cat).replace('_', ' '),
+    })),
   ];
 
   const renderProduct = ({ item }: { item: Product }) => (
@@ -116,6 +117,18 @@ export const HomeScreen = ({ navigation }: any) => {
           </Text>
         </View>
       </View>
+      {/* NEW: Stock Badge */}
+      {item.availableStock === 0 && (
+        <View style={styles.outOfStockBadge}>
+          <Text style={styles.outOfStockText}>Out of Stock</Text>
+        </View>
+      )}
+      
+      {item.availableStock > 0 && item.availableStock <= item.lowStockThreshold && (
+        <View style={styles.lowStockBadge}>
+          <Text style={styles.lowStockText}>Only {item.availableStock} left!</Text>
+        </View>
+      )}
     </TouchableOpacity>
   );
 
@@ -169,6 +182,8 @@ export const HomeScreen = ({ navigation }: any) => {
           )}
         </View>
 
+        <BannerCarousel navigation={navigation} />
+
         {/* Search Bar */}
         <View style={styles.searchContainer}>
           <Text style={styles.searchIcon}>🔍</Text>
@@ -201,7 +216,7 @@ export const HomeScreen = ({ navigation }: any) => {
                 ]}
                 onPress={() => setSelectedCategory(item.value)}
               >
-                <Text style={styles.categoryIcon}>{item.icon}</Text>
+                {/* <Text style={styles.categoryIcon}>{item.icon}</Text> */}
                 <Text
                   style={[
                     styles.categoryLabel,
@@ -259,6 +274,10 @@ export const HomeScreen = ({ navigation }: any) => {
           />
         </>
       )}
+
+      {/* Promotional Banners */}
+      <PromoBanners navigation={navigation} />
+
     </View>
   );
 };
@@ -502,5 +521,31 @@ const styles = StyleSheet.create({
   },
   headerTextContainer: {
     flex: 1,
+  },
+  outOfStockBadge: {
+    backgroundColor: '#f44336',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    marginTop: 8,
+  },
+  outOfStockText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  lowStockBadge: {
+    backgroundColor: '#FFC107',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    marginTop: 8,
+  },
+  lowStockText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });

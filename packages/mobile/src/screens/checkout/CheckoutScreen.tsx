@@ -56,6 +56,7 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
   const [selectedAddress, setSelectedAddress] = useState<UserAddress | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.COD);
   const [loading, setLoading] = useState(false);
+  const [submittingUPI, setSubmittingUPI] = useState(false); // For UPI submission only
 
   // Delivery slot state
   const [deliveryArea, setDeliveryArea] = useState<DeliveryArea | null>(null);
@@ -448,7 +449,6 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
     }
 
     // Validate stock availability
-    setLoading(true);
     try {
       const stockCheck = await checkStockAvailability(
         cartItems.map(item => ({
@@ -551,7 +551,9 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
 
       // Check if it's a stock error
       if (error.message?.includes('Insufficient stock')) {
-        showToast.error('Some items are out of stock. Please refresh and try again.');
+        showToast.error('Some items are out of stock. Please refresh your cart and try again.');
+      } else if (error.message?.includes('Product') && error.message?.includes('not found')) {
+        showToast.error('Some products in your cart are no longer available. Please refresh your cart and try again.');
       } else {
         showToast.error('Failed to place order. Please try again.');
       }
@@ -577,7 +579,7 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
       return;
     }
 
-    setLoading(true);
+    setSubmittingUPI(true); // Use separate state
     setShowUPIModal(false);
 
     try {
@@ -608,7 +610,7 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
       console.error('Error creating order:', error);
       showToast.error('Failed to create order. Please try again.');
     } finally {
-      setLoading(false);
+      setSubmittingUPI(false);
       setUpiPaymentAcknowledged(false);
     }
   };
@@ -1190,12 +1192,12 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
               <TouchableOpacity
                 style={[
                   styles.submitUPIButton,
-                  (!upiPaymentAcknowledged || loading) && styles.submitUPIButtonDisabled,
+                  (!upiPaymentAcknowledged || submittingUPI) && styles.submitUPIButtonDisabled,
                 ]}
                 onPress={handleUPIPaymentDone}
-                disabled={!upiPaymentAcknowledged || loading}
+                disabled={!upiPaymentAcknowledged || submittingUPI}
               >
-                {loading ? (
+                {submittingUPI ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
                   <Text style={styles.submitUPIButtonText}>

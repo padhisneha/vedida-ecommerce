@@ -18,6 +18,7 @@ import {
 import { getFirebaseFirestore } from './firebase-config';
 import { DeliverySlot, DeliveryArea, AppSettings } from '../types';
 import { DELIVERY_SLOT_LABELS } from '../constants';
+import { COLLECTIONS } from '../types';
 
 /**
  * Get all delivery areas
@@ -142,7 +143,7 @@ export const updateDeliveryAreaSlots = async (
 ): Promise<void> => {
   const db = getFirebaseFirestore();
   try {
-    const areaRef = doc(db, 'deliveryAreas', areaId);
+    const areaRef = doc(db, COLLECTIONS.DELIVERY_AREAS, areaId);
     
     await updateDoc(areaRef, {
       slots,
@@ -162,7 +163,7 @@ export const updateDeliveryAreaSlots = async (
 export const toggleDeliveryArea = async (areaId: string): Promise<void> => {
   const db = getFirebaseFirestore();
   try {
-    const areaRef = doc(db, 'deliveryAreas', areaId);
+    const areaRef = doc(db, COLLECTIONS.DELIVERY_AREAS, areaId);
     const areaDoc = await getDoc(areaRef);
     
     if (!areaDoc.exists()) {
@@ -189,7 +190,7 @@ export const toggleDeliveryArea = async (areaId: string): Promise<void> => {
 export const deleteDeliveryArea = async (areaId: string): Promise<void> => {
   const db = getFirebaseFirestore();
   try {
-    const areaRef = doc(db, 'deliveryAreas', areaId);
+    const areaRef = doc(db, COLLECTIONS.DELIVERY_AREAS, areaId);
     await deleteDoc(areaRef);
     console.log('✅ Delivery area deleted:', areaId);
   } catch (error) {

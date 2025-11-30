@@ -14,6 +14,7 @@ import {
   formatCurrency,
   formatDate,
   getProductEmoji,
+  initialCapital,
 } from '@ecommerce/shared';
 import { useAuth } from '@/contexts/AuthContext';
 import AddStockModal from '@/components/inventory/AddStockModal';
@@ -402,13 +403,11 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                         value={formData.category}
                         onChange={(e) => setFormData({ ...formData, category: e.target.value as ProductCategory })}
                       >
-                        <option value={ProductCategory.MILK}>Milk</option>
-                        <option value={ProductCategory.CURD}>Curd</option>
-                        <option value={ProductCategory.GHEE}>Ghee</option>
-                        <option value={ProductCategory.PANEER}>Paneer</option>
-                        <option value={ProductCategory.BUTTER}>Butter</option>
-                        <option value={ProductCategory.BUTTERMILK}>Buttermilk</option>
-                        <option value={ProductCategory.OTHER}>Other</option>
+                        {Object.values(ProductCategory).map((cat) => (
+                          <option key={cat} value={cat}>
+                              {initialCapital(cat).replace('_', ' ')}
+                          </option>
+                        ))}
                       </select>
                     </div>
 

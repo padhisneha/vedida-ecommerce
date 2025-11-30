@@ -203,7 +203,7 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
             {formatCurrency(product.price * quantity)}
           </Text>
         </View>
-        <TouchableOpacity
+        {/* <TouchableOpacity
           style={[
             styles.addToCartButton,
             (!product.inStock || addingToCart) && styles.buttonDisabled,
@@ -218,6 +218,18 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
               {product.inStock ? 'Add to Cart' : 'Out of Stock'}
             </Text>
           )}
+        </TouchableOpacity> */}
+        <TouchableOpacity
+          style={[
+            styles.addToCartButton,
+            product.availableStock === 0 && styles.buttonDisabled,
+          ]}
+          onPress={handleAddToCart}
+          disabled={product.availableStock === 0}
+        >
+          <Text style={styles.addToCartText}>
+            {product.availableStock === 0 ? 'Out of Stock' : 'Add to Cart'}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>

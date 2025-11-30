@@ -12,6 +12,7 @@ import {
   uploadImage,
   generateProductImagePath,
   addStock,
+  initialCapital,
 } from '@ecommerce/shared';
 import { useAuth } from '@/contexts/AuthContext';
 import { showToast } from '@/lib/toast';
@@ -117,14 +118,15 @@ export default function NewProductPage() {
         price: calculatedPrice,
         unit: formData.unit,
         quantity: formData.quantity,
-        availableStock: formData.availableStock,
+        availableStock: 0, // ← Start with ZERO stock, will add below
         lowStockThreshold: formData.lowStockThreshold,
-        inStock: formData.availableStock > 0,
+        inStock: false, // ← Start with FALSE, will update below
         allowSubscription: formData.allowSubscription,
       });
 
       // If initial stock > 0, record it in stock movements
       if (formData.availableStock > 0) {
+        console.log(`📝 Adding initial stock: ${formData.availableStock} units`);
                 
         await addStock(
           productId,
@@ -133,6 +135,8 @@ export default function NewProductPage() {
           user?.name || 'Admin',
           'Initial stock'
         );
+
+        console.log(`✅ Initial stock added via transaction`);  
       }
 
       // Upload image if selected
@@ -281,13 +285,11 @@ export default function NewProductPage() {
                       value={formData.category}
                       onChange={(e) => setFormData({ ...formData, category: e.target.value as ProductCategory })}
                     >
-                      <option value={ProductCategory.MILK}>🥛 Milk</option>
-                      <option value={ProductCategory.CURD}>🥣 Curd</option>
-                      <option value={ProductCategory.GHEE}>🧈 Ghee</option>
-                      <option value={ProductCategory.PANEER}>🧀 Paneer</option>
-                      <option value={ProductCategory.BUTTER}>🧈 Butter</option>
-                      <option value={ProductCategory.BUTTERMILK}>🥤 Buttermilk</option>
-                      <option value={ProductCategory.OTHER}>📦 Other</option>
+                      {Object.values(ProductCategory).map((cat) => (
+                        <option key={cat} value={cat}>
+                            {initialCapital(cat).replace('_', ' ')}
+                        </option>
+                      ))}
                     </select>
                   </div>
 

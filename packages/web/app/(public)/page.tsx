@@ -7,6 +7,8 @@ import { ShoppingBag, Smartphone, Mail } from 'lucide-react';
 import { Facebook, Instagram, Twitter, Linkedin, Youtube, X } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
+import BannerCarousel from '@/components/home/BannerCarousel';
+import PromoBanners from '@/components/home/PromoBanners';
 
 type ModalType = 'about' | 'privacy' | 'refund' | null;
 
@@ -319,6 +321,11 @@ export default function HomePage() {
         </div>
       </nav>
 
+      {/* Banner Carousel at the top */}
+      <div className="container mx-auto px-4 py-8">
+        <BannerCarousel />
+      </div>
+
       {/* Hero Section */}
       <section className="bg-gradient-to-br from-green-50 to-white py-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -372,7 +379,6 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
 
       {/* Products Showcase - Smooth One-by-One Carousel */}
       <section id="products" className="py-10 bg-gray-50">
@@ -552,7 +558,6 @@ export default function HomePage() {
       </div>
       </section>
 
-
       {/* How It Works */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -604,15 +609,19 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Promotional Banners */}
+      <div className="container mx-auto px-4 py-8">
+        <PromoBanners />
+      </div>      
+
       {/* Dynamic Offers Carousel - Floating Cards */}
-      <section className="py-12 bg-white1 relative overflow-hidden">
-        {/* Background decoration */}
+      {/* <section className="py-12 bg-white1 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-green-50 via-blue-50 to-purple-50 opacity-50"></div>
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
             <div className="text-center mb-8">
             <h2 className="text-3xl font-bold text-gray-900 mb-2">Special Offers</h2>
-            {/* <p className="text-gray-600">Limited time deals just for you</p> */}
+            <p className="text-gray-600">Limited time deals just for you</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -671,7 +680,7 @@ export default function HomePage() {
             ))}
             </div>
         </div>
-      </section>
+      </section> */}
 
       {/* Benefits Section */}
       <section className="py-20 bg-green-50">
@@ -829,7 +838,7 @@ export default function HomePage() {
       </section>
 
       {/* Service Areas */}
-      <section className="py-20 bg-gray-50">
+      {/* <section className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">We Deliver To</h2>
@@ -865,10 +874,10 @@ export default function HomePage() {
             </a>
           </div>
         </div>
-      </section>
+      </section> */}
 
       {/* Stats Section */}
-      <section className="py-16 bg-green-600 text-white">
+      {/* <section className="py-16 bg-green-600 text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 text-center">
             <div>
@@ -885,7 +894,7 @@ export default function HomePage() {
             </div>
           </div>
         </div>
-      </section>
+      </section> */}
 
       {/* Contact Section */}
       <section id="contact" className="py-20 bg-white">

@@ -17,11 +17,7 @@ import { getFirebaseFirestore } from './firebase-config';
 import { StockMovement, StockMovementType, Product, UserRole, NotificationType } from '../types';
 import { createNotification } from './notifications';
 import { getUsersByRole } from './users';
-
-const COLLECTIONS = {
-  STOCK_MOVEMENTS: 'stockMovements',
-  PRODUCTS: 'products',
-};
+import { COLLECTIONS } from '../types';
 
 /**
  * Add stock to a product
@@ -77,135 +73,6 @@ export const addStock = async (
   });
 
   console.log(`✅ Added ${quantityToAdd} units to product ${productId}`);
-};
-
-/**
- * Reduce stock for order items
- * Uses transaction to prevent overselling
- */
-export const reduceStockForOrder = async (
-  orderId: string,
-  orderNumber: string,
-  items: Array<{ productId: string; quantity: number }>
-): Promise<void> => {
-  const db = getFirebaseFirestore();
-
-  await runTransaction(db, async (transaction) => {
-    // Check stock availability for all items first
-    for (const item of items) {
-      const productRef = doc(db, COLLECTIONS.PRODUCTS, item.productId);
-      const productDoc = await transaction.get(productRef);
-
-      if (!productDoc.exists()) {
-        throw new Error(`Product ${item.productId} not found`);
-      }
-
-      const product = productDoc.data() as Product;
-      const availableStock = product.availableStock || 0;
-
-      if (availableStock < item.quantity) {
-        throw new Error(
-          `Insufficient stock for ${product.name}. Available: ${availableStock}, Required: ${item.quantity}`
-        );
-      }
-    }
-
-    // All items have sufficient stock, proceed with reduction
-    for (const item of items) {
-      const productRef = doc(db, COLLECTIONS.PRODUCTS, item.productId);
-      const productDoc = await transaction.get(productRef);
-      const product = productDoc.data() as Product;
-
-      const previousStock = product.availableStock || 0;
-      const newStock = previousStock - item.quantity;
-
-      // Update product stock
-      transaction.update(productRef, {
-        availableStock: newStock,
-        inStock: newStock > 0,
-        updatedAt: Timestamp.now(),
-      });
-
-      // Record stock movement
-      const movementRef = doc(collection(db, COLLECTIONS.STOCK_MOVEMENTS));
-      transaction.set(movementRef, {
-        productId: item.productId,
-        productName: product.name,
-        type: StockMovementType.OUT,
-        quantity: -item.quantity,
-        previousStock,
-        newStock,
-        reason: `Order ${orderNumber}`,
-        referenceId: orderId,
-        referenceType: 'order',
-        createdBy: 'system',
-        createdByName: 'System',
-        createdAt: Timestamp.now(),
-      });
-    }
-  });
-
-  // Check and notify for low stock
-  for (const item of items) {
-    await checkAndNotifyLowStock(item.productId);
-  }
-
-  console.log(`✅ Stock reduced for order ${orderNumber}`);
-};
-
-/**
- * Restore stock when order is cancelled
- */
-export const restoreStockForOrder = async (
-  orderId: string,
-  orderNumber: string,
-  items: Array<{ productId: string; quantity: number; productName?: string }>,
-  adminId: string,
-  adminName: string
-): Promise<void> => {
-  const db = getFirebaseFirestore();
-
-  await runTransaction(db, async (transaction) => {
-    for (const item of items) {
-      const productRef = doc(db, COLLECTIONS.PRODUCTS, item.productId);
-      const productDoc = await transaction.get(productRef);
-
-      if (!productDoc.exists()) {
-        console.warn(`Product ${item.productId} not found, skipping stock restoration`);
-        continue;
-      }
-
-      const product = productDoc.data() as Product;
-      const previousStock = product.availableStock || 0;
-      const newStock = previousStock + item.quantity;
-
-      // Restore product stock
-      transaction.update(productRef, {
-        availableStock: newStock,
-        inStock: newStock > 0,
-        updatedAt: Timestamp.now(),
-      });
-
-      // Record stock movement
-      const movementRef = doc(collection(db, COLLECTIONS.STOCK_MOVEMENTS));
-      transaction.set(movementRef, {
-        productId: item.productId,
-        productName: item.productName || product.name,
-        type: StockMovementType.IN,
-        quantity: item.quantity,
-        previousStock,
-        newStock,
-        reason: `Stock restored - Order ${orderNumber} cancelled`,
-        referenceId: orderId,
-        referenceType: 'order',
-        createdBy: adminId,
-        createdByName: adminName,
-        createdAt: Timestamp.now(),
-      });
-    }
-  });
-
-  console.log(`✅ Stock restored for order ${orderNumber}`);
 };
 
 /**

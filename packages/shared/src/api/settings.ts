@@ -2,6 +2,7 @@ import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { getFirebaseFirestore } from './firebase-config';
 import { AppSettings, DEFAULT_SETTINGS } from '../types/settings';
 import { getCurrentTimestamp } from '../utils';
+import { COLLECTIONS } from '../types';
 
 const SETTINGS_DOC_ID = 'app_settings';
 
@@ -10,7 +11,7 @@ const SETTINGS_DOC_ID = 'app_settings';
  */
 export const getAppSettings = async (): Promise<AppSettings> => {
   const db = getFirebaseFirestore();
-  const settingsDoc = await getDoc(doc(db, 'settings', SETTINGS_DOC_ID));
+  const settingsDoc = await getDoc(doc(db, COLLECTIONS.SETTINGS, SETTINGS_DOC_ID));
 
   if (!settingsDoc.exists()) {
     // Create default settings if they don't exist
@@ -20,7 +21,7 @@ export const getAppSettings = async (): Promise<AppSettings> => {
       updatedAt: getCurrentTimestamp(),
     };
     
-    await setDoc(doc(db, 'settings', SETTINGS_DOC_ID), defaultSettings);
+    await setDoc(doc(db, COLLECTIONS.SETTINGS, SETTINGS_DOC_ID), defaultSettings);
     return defaultSettings;
   }
 
@@ -38,7 +39,7 @@ export const updateAppSettings = async (
 ): Promise<void> => {
   const db = getFirebaseFirestore();
   
-  await updateDoc(doc(db, 'settings', SETTINGS_DOC_ID), {
+  await updateDoc(doc(db, COLLECTIONS.SETTINGS, SETTINGS_DOC_ID), {
     ...updates,
     updatedAt: getCurrentTimestamp(),
   });
