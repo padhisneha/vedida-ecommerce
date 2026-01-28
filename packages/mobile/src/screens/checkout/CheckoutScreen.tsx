@@ -400,12 +400,12 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
     }
 
     const options = {
-      description: 'Vedida Farms Order',
-      image: RAZORPAY_CONFIG.businessLogo,
-      currency: 'INR',
       key: RAZORPAY_CONFIG.keyId,
       amount: Math.round(finalPrices.total * 100),
+      currency: 'INR',
       name: RAZORPAY_CONFIG.businessName,
+      description: 'Vedida Farms Order',
+      //image: RAZORPAY_CONFIG.businessLogo,
       prefill: {
         email: user.email || '',
         contact: user.phoneNumber || '',
@@ -414,9 +414,10 @@ export const CheckoutScreen = ({ route, navigation }: any) => {
       theme: { color: RAZORPAY_CONFIG.themeColor },
     };
 
+    console.log('Opening Razorpay with options:', options);
+
     try {
       const data = await RazorpayCheckout.open(options);
-      
       console.log('✅ Payment Success:', data);
       
       return {
