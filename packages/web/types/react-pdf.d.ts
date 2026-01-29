@@ -35,4 +35,11 @@ declare module '@react-pdf/renderer' {
   export const StyleSheet: {
     create: <T>(styles: T) => T;
   };
+
+  // Add the pdf function
+  export const pdf: (element: React.ReactElement) => {
+    toBlob: () => Promise<Blob>;
+    toString: () => Promise<string>;
+    toBuffer: () => Promise<Buffer>;
+  };
 }

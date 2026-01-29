@@ -1,6 +1,7 @@
 import { pdf } from '@react-pdf/renderer';
 import { InvoicePDF } from '@/components/invoice/InvoicePDF';
 import { Order, Subscription, SubscriptionFrequency } from '@ecommerce/shared';
+import { createElement } from 'react';
 
 /**
  * Convert number to words in Indian style
@@ -103,8 +104,18 @@ export const generateOrderInvoicePDF = async (
     const amountInWords = amountToWordsIndian(order.totalAmount);
     const totalDeliveries = 1; // For one-time orders
     
+    //const blob = await pdf(
+    //  InvoicePDF({ order, taxBreakdown, amount, amountInWords, totalDeliveries })
+    //).toBlob();
+
     const blob = await pdf(
-      InvoicePDF({ order, taxBreakdown, amount, amountInWords, totalDeliveries })
+      createElement(InvoicePDF, { 
+        order, 
+        taxBreakdown, 
+        amount, 
+        amountInWords, 
+        totalDeliveries 
+      })
     ).toBlob();
 
     const url = URL.createObjectURL(blob);
@@ -138,9 +149,18 @@ export const generateSubscriptionInvoicePDF = async (
     const amount = (taxBreakdown.subtotal + taxBreakdown.totalTax)* totalDeliveries;
     const amountInWords = amountToWordsIndian(amount);
     
-    
+    //const blob = await pdf(
+    //  InvoicePDF({ subscription, taxBreakdown, amount, amountInWords, totalDeliveries })
+    //).toBlob();
+
     const blob = await pdf(
-      InvoicePDF({ subscription, taxBreakdown, amount, amountInWords, totalDeliveries })
+      createElement(InvoicePDF, { 
+        subscription, 
+        taxBreakdown, 
+        amount, 
+        amountInWords, 
+        totalDeliveries 
+      })
     ).toBlob();
 
     const url = URL.createObjectURL(blob);
