@@ -30,19 +30,18 @@ export const formatDate = (
   locale: string = 'en-IN'
 ): string => {
   let date: Date;
-  
-  if (typeof timestamp === 'number') {
-    // Handle milliseconds
+
+  if (timestamp instanceof Date) {
+    date = timestamp;
+  } else if (typeof timestamp === 'number') {
     date = new Date(timestamp);
-  } else if (timestamp && typeof timestamp.toDate === 'function') {
-    // Handle Firestore Timestamp
+  } else if (timestamp instanceof Timestamp) {
     date = timestamp.toDate();
   } else {
-    // Fallback
     console.error('Invalid timestamp format:', timestamp);
     return 'Invalid Date';
   }
-  
+
   return date.toLocaleDateString(locale, {
     year: 'numeric',
     month: 'long',
