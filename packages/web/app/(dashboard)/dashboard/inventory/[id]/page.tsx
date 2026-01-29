@@ -577,7 +577,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                 <div className="space-y-4">
                   <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
                     <p className="text-sm text-yellow-800">
-                      ℹ️ <strong>Note:</strong> To add or adjust stock quantities, use the "Add Stock" or "Manual Adjustment" buttons.
+                      ℹ️ <strong>Note:</strong> To add or adjust stock quantities, use the &quot;Add Stock&quot; or &quot;Manual Adjustment&quot; buttons.
                     </p>
                   </div>
 
@@ -587,7 +587,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                       {product.availableStock} units
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
-                      Stock quantity cannot be edited directly. Use "Add Stock" or "Manual Adjustment" buttons.
+                      Stock quantity cannot be edited directly. Use &quot;Add Stock&quot; or &quot;Manual Adjustment&quot; buttons.
                     </p>
                   </div>
 
@@ -607,7 +607,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                       required
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      You'll get an alert when stock falls below this level
+                      You&apos;ll get an alert when stock falls below this level
                     </p>
                   </div>
                 </div>

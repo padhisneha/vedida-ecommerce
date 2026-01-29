@@ -440,11 +440,11 @@ export default function StockReconciliationPage() {
         <ol className="space-y-2 text-sm text-gray-700">
           <li className="flex gap-2">
             <span className="font-bold text-primary-600">1.</span>
-            <span>Select a product or choose "All Products"</span>
+            <span>Select a product or choose &quot;All Products&quot;</span>
           </li>
           <li className="flex gap-2">
             <span className="font-bold text-primary-600">2.</span>
-            <span>Click "Analyze" to scan inventory and check console for detailed logs</span>
+            <span>Click &quot;Analyze&quot; to scan inventory and check console for detailed logs</span>
           </li>
           <li className="flex gap-2">
             <span className="font-bold text-primary-600">3.</span>
@@ -452,7 +452,7 @@ export default function StockReconciliationPage() {
           </li>
           <li className="flex gap-2">
             <span className="font-bold text-primary-600">4.</span>
-            <span>Fix individual products or use "Fix All" for bulk correction</span>
+            <span>Fix individual products or use &quot;Fix All&quot; for bulk correction</span>
           </li>
         </ol>
       </div>
@@ -573,7 +573,7 @@ export default function StockReconciliationPage() {
             Ready to Analyze
           </h3>
           <p className="text-gray-600 mb-6">
-            Select a product or choose "All Products" and click Analyze
+            Select a product or choose &quot;All Products&quot; and click Analyze
           </p>
         </div>
       ) : filteredResults.length === 0 ? (
@@ -757,7 +757,7 @@ export default function StockReconciliationPage() {
             </p>
             <p>
               No stock movements recorded for this product. This is normal for products created before 
-              stock tracking was implemented, or if initial stock movement wasn't recorded. 
+              stock tracking was implemented, or if initial stock movement wasn&apos;t recorded. 
               Current stock is treated as baseline.
             </p>
           </div>
@@ -771,7 +771,7 @@ export default function StockReconciliationPage() {
             </p>
             <ul className="list-disc ml-5 mt-1 text-xs">
               <li>Stock was manually added without recording movement</li>
-              <li>Order was cancelled but stock wasn't restored</li>
+              <li>Order was cancelled but stock wasn&apos;t restored</li>
               <li>Initial stock was set incorrectly</li>
             </ul>
           </div>
@@ -796,7 +796,7 @@ export default function StockReconciliationPage() {
             </p>
             <ul className="list-disc ml-5 mt-1 text-xs text-blue-800">
               <li>Open browser console (F12) to see detailed calculation logs</li>
-              <li>Check the "View Stock History" link for each product to see all movements</li>
+              <li>Check the &quot;View Stock History&quot; link for each product to see all movements</li>
               <li>Run reconciliation weekly to catch issues early</li>
               <li>Always investigate root cause before fixing</li>
             </ul>

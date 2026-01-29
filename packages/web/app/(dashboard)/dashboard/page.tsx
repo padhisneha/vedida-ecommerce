@@ -269,7 +269,7 @@ export default function DashboardPage() {
           Welcome, {user?.name || 'Admin'}! 
         </h1>
         <p className="text-gray-600 mt-2">
-          Here's what's happening with your business today
+          Here&apos;s what&apos;s happening with your business today
         </p>
       </div>
 
@@ -388,7 +388,7 @@ export default function DashboardPage() {
         <div className="card bg-gradient-to-br from-green-50 to-green-100">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-green-800">Today's Revenue</p>
+              <p className="text-sm font-medium text-green-800">Today&apos;s Revenue</p>
               <p className="text-3xl font-bold text-green-900 mt-2">
                 {formatCurrency(todayRevenue)}
               </p>
@@ -408,7 +408,7 @@ export default function DashboardPage() {
         <div className="card">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-gray-900">
-              📋 Today's Delivery Summary
+              📋 Today&apos;s Delivery Summary
             </h2>
             <span className="text-sm text-gray-500">
               {getTodayOrders().length} orders
@@ -446,7 +446,7 @@ export default function DashboardPage() {
               <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
                 <p className="text-sm text-green-800 font-medium flex items-center justify-center gap-2">
                   <span>✅</span>
-                  <span>Today's subscription orders have been generated</span>
+                  <span>Today&apos;s subscription orders have been generated</span>
                 </p>
                 <p className="text-xs text-green-700 mt-1">
                   {getTodayOrders().filter(o => o.type === 'subscription').length} subscription orders created
@@ -472,7 +472,7 @@ export default function DashboardPage() {
                   ) : (
                     <span className="flex items-center justify-center gap-2">
                       <span>📦</span>
-                      <span>Generate Today's Subscription Orders</span>
+                      <span>Generate Today&apos;s Subscription Orders</span>
                     </span>
                   )}
                 </button>

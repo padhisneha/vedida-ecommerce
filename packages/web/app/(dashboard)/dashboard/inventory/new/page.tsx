@@ -446,7 +446,7 @@ export default function NewProductPage() {
                     required
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    You'll get an alert when stock falls below this level
+                    You&apos;ll get an alert when stock falls below this level
                   </p>
                 </div>
 

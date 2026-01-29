@@ -141,7 +141,7 @@ export default function AdjustStockModal({
                 Use with Caution
               </p>
               <p className="text-xs text-yellow-700 mt-1">
-                Manual adjustments bypass normal stock flow. Use "Add Stock" for regular stock additions. 
+                Manual adjustments bypass normal stock flow. Use &quot;Add Stock&quot; for regular stock additions. 
                 This should only be used for corrections or inventory audits.
               </p>
             </div>
@@ -232,7 +232,7 @@ export default function AdjustStockModal({
               {difference < -50 && (
                 <div className="mt-3 pt-3 border-t border-red-200">
                   <p className="text-xs text-red-700 font-medium">
-                    ⚠️ Large Decrease: You're reducing stock by {Math.abs(difference)} units
+                    ⚠️ Large Decrease: You&apos;re reducing stock by {Math.abs(difference)} units
                   </p>
                 </div>
               )}

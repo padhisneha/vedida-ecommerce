@@ -279,7 +279,7 @@ export default function CustomersPage() {
           {/* Results count */}
           {searchQuery && (
             <div className="mt-4 text-sm text-gray-600">
-              Found {filteredCount} result{filteredCount !== 1 ? 's' : ''} for "{searchQuery}"
+              Found {filteredCount} result{filteredCount !== 1 ? 's' : ''} for &quot;{searchQuery}&quot;
             </div>
           )}
 

@@ -804,7 +804,7 @@ export default function SettingsPage() {
             <div className="text-center py-12 text-gray-500">
               <p className="mb-4 text-4xl">🚧</p>
               <p>Operator management coming soon</p>
-              <p className="text-sm mt-2">You'll be able to add and manage operators with limited permissions</p>
+              <p className="text-sm mt-2">You&apos;ll be able to add and manage operators with limited permissions</p>
             </div>
           </div>
         </div>

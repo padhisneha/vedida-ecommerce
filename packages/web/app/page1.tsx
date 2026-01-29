@@ -14,7 +14,7 @@ export default function DashboardPage() {
           Welcome back, {user?.name || 'Admin'}! 
         </h1>
         <p className="text-gray-600 mt-2">
-          Here's what's happening with your business today
+          Here&apos;s what&apos;s happening with your business today
         </p>
       </div>
 
@@ -56,7 +56,7 @@ export default function DashboardPage() {
         <div className="card hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Today's Revenue</p>
+              <p className="text-sm font-medium text-gray-600">Today&apos;s Revenue</p>
               <p className="text-3xl font-bold text-gray-900 mt-2">₹12,450</p>
               <p className="text-xs text-green-600 mt-2">↑ 8% from avg</p>
             </div>
@@ -69,7 +69,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <div className="card">
           <h2 className="text-lg font-bold text-gray-900 mb-4">
-            📋 Today's Delivery Summary
+            📋 Today&apos;s Delivery Summary
           </h2>
           <div className="space-y-3">
             <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
