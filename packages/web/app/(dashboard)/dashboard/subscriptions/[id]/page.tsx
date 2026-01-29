@@ -1,7 +1,7 @@
 // packages/web/app/%28dashboard%29/dashboard/subscriptions/[id]/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -45,13 +45,10 @@ export default function SubscriptionDetailPage({ params }: { params: { id: strin
   const [slotValue, setSlotValue] = useState<'morning' | 'evening'>('morning');
   const [savingSlot, setSavingSlot] = useState(false);
 
-  useEffect(() => {
-    loadSubscription();
-    loadDeliveryPartners();
-  }, [params.id]);
-
-  const loadSubscription = async () => {
+  const loadSubscription = useCallback(async () => {
     try {
+      setLoading(true);
+
       const data = await getSubscriptionWithProducts(params.id);
       setSubscription(data);
       setSelectedPartner(data.deliveryPartnerId || '');
@@ -69,14 +66,18 @@ export default function SubscriptionDetailPage({ params }: { params: { id: strin
     } finally {
       setLoading(false);
     }
-  };
+  }, [params.id]);
 
-  const loadDeliveryPartners = async () => {
+  const loadDeliveryPartners = useCallback(async () => {
     setLoadingPartners(true);
     try {
       const partners = await getUsersByRole(UserRole.DELIVERY_PARTNER);
+
       // Filter only active delivery partners
-      const activePartners = partners.filter(partner => partner.isActive !== false);
+      const activePartners = partners.filter(
+        partner => partner.isActive !== false
+      );
+
       setDeliveryPartners(activePartners);
       console.log('✅ Loaded delivery partners:', activePartners);
     } catch (error) {
@@ -85,7 +86,12 @@ export default function SubscriptionDetailPage({ params }: { params: { id: strin
     } finally {
       setLoadingPartners(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadSubscription();
+    loadDeliveryPartners();
+  }, [loadSubscription, loadDeliveryPartners]);
 
   const handleStatusUpdate = async (newStatus: SubscriptionStatus, pauseUntil?: Date) => {
     if (!subscription) return;

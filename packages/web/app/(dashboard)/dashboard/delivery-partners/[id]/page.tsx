@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -40,14 +40,9 @@ export default function DeliveryPartnerDetailPage({ params }: { params: { id: st
     vehicleNumber: '',
   });
 
-  useEffect(() => {
-    loadPartner();
-    loadStats();
-    loadAssignedOrders();
-  }, [params.id]);
-
-  const loadPartner = async () => {
+  const loadPartner = useCallback(async () => {
     try {
+      setLoading(true);
       const data = await getUserById(params.id);
       if (data) {
         setPartner(data);
@@ -64,35 +59,35 @@ export default function DeliveryPartnerDetailPage({ params }: { params: { id: st
     } finally {
       setLoading(false);
     }
-  };
+  }, [params.id]);
 
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     try {
       const data = await getDeliveryPartnerStats(params.id);
       setStats(data);
     } catch (error) {
       console.error('Error loading stats:', error);
     }
-  };
+  }, [params.id]);
 
-  const loadAssignedOrders = async () => {
+  const loadAssignedOrders = useCallback(async () => {
     setLoadingOrders(true);
     try {
       const allOrders = await getAllOrders();
-      
-      // Filter orders assigned to this partner, excluding DELIVERED and CANCELLED
+
       const partnerOrders = allOrders.filter(
-        order => 
+        order =>
           order.deliveryPartnerId === params.id &&
           order.status !== OrderStatus.DELIVERED &&
           order.status !== OrderStatus.CANCELLED
       );
-      
-      // Sort by scheduled delivery date (earliest first)
-      partnerOrders.sort((a, b) => 
-        a.scheduledDeliveryDate.toMillis() - b.scheduledDeliveryDate.toMillis()
+
+      partnerOrders.sort(
+        (a, b) =>
+          a.scheduledDeliveryDate.toMillis() -
+          b.scheduledDeliveryDate.toMillis()
       );
-      
+
       setAssignedOrders(partnerOrders);
       console.log('✅ Loaded assigned orders:', partnerOrders.length);
     } catch (error) {
@@ -101,7 +96,13 @@ export default function DeliveryPartnerDetailPage({ params }: { params: { id: st
     } finally {
       setLoadingOrders(false);
     }
-  };
+  }, [params.id]);
+
+  useEffect(() => {
+    loadPartner();
+    loadStats();
+    loadAssignedOrders();
+  }, [loadPartner, loadStats, loadAssignedOrders]);
 
   const handleSave = async () => {
     if (!partner) return;

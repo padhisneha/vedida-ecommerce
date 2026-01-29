@@ -12,6 +12,7 @@ import {
   BannerPosition,
   BannerActionType,
 } from '@ecommerce/shared';
+import Image from 'next/image';
 
 export default function BannerCarousel() {
   const router = useRouter();
@@ -131,11 +132,15 @@ export default function BannerCarousel() {
               index === currentIndex ? 'opacity-100' : 'opacity-0'
             }`}
           >
-            <img
-              src={banner.imageUrl}
-              alt={banner.title}
-              className="w-full h-full object-cover"
-            />
+            <div className="relative w-full h-full">
+              <Image
+                src={banner.imageUrl}
+                alt={banner.title}
+                fill
+                className="object-cover"
+                priority={index === 0}   // only first banner is high priority
+              />
+            </div>
             
             {/* Gradient Overlay for Better Text Readability */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />

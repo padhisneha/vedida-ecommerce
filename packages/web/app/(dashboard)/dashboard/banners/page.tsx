@@ -14,6 +14,7 @@ import {
   BannerActionType,
 } from '@ecommerce/shared';
 import { showToast } from '@/lib/toast';
+import Image from 'next/image';
 
 export default function BannersPage() {
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -299,11 +300,15 @@ export default function BannersPage() {
                 {/* Banner Image Preview */}
                 <div className="w-48 h-32 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
                   {banner.imageUrl ? (
-                    <img
-                      src={banner.imageUrl}
-                      alt={banner.title}
-                      className="w-full h-full object-cover"
-                    />
+                    <div className="relative w-full h-full">
+                      <Image
+                        src={banner.imageUrl}
+                        alt={banner.title}
+                        fill
+                        className="object-cover"
+                        priority
+                      />
+                    </div>
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-4xl">
                       🎨

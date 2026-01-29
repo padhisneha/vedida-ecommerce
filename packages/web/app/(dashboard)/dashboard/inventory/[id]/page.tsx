@@ -1,7 +1,7 @@
 // packages/web/app/(dashboard)/dashboard/inventory/[id]/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -20,6 +20,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import AddStockModal from '@/components/inventory/AddStockModal';
 import AdjustStockModal from '@/components/inventory/AdjustStockModal';
 import { showToast } from '@/lib/toast';
+import Image from 'next/image';
 
 export default function ProductDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -54,12 +55,10 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
     allowSubscription: false,
   });
 
-  useEffect(() => {
-    loadProduct();
-  }, [params.id]);
-
-  const loadProduct = async () => {
+  const loadProduct = useCallback(async () => {
     try {
+      setLoading(true);
+
       const data = await getProductById(params.id);
       if (data) {
         setProduct(data);
@@ -85,7 +84,11 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
     } finally {
       setLoading(false);
     }
-  };
+  }, [params.id]);
+
+  useEffect(() => {
+    loadProduct();
+  }, [loadProduct]);
 
   const calculatePriceWithTax = () => {
     const tax = (formData.priceExcludingTax * (formData.taxCGST + formData.taxSGST)) / 100;
@@ -454,17 +457,25 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                     {/* Image Preview */}
                     <div className="h-64 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
                     {imagePreview ? (
-                        <img
-                        src={imagePreview}
-                        alt="Preview"
-                        className="w-full h-full object-cover"
-                        />
+                        <div className="relative w-full h-full">
+                          <Image
+                            src={imagePreview}
+                            alt="Preview"
+                            fill
+                            className="object-cover"
+                            unoptimized
+                          />
+                        </div>
                     ) : product.imageUrl ? (
-                        <img
-                        src={product.imageUrl}
-                        alt={product.name}
-                        className="w-full h-full object-cover"
-                        />
+                        <div className="relative w-full h-full">
+                          <Image
+                            src={product.imageUrl}
+                            alt={product.name}
+                            fill
+                            className="object-cover"
+                            priority
+                          />
+                        </div>
                     ) : (
                         <div className="text-8xl">📦</div>
                     )}
@@ -654,11 +665,14 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
               <div className="card">
                 <div className="h-64 bg-gray-100 rounded-lg flex items-center justify-center">
                   {product.imageUrl ? (
-                    <img
-                      src={product.imageUrl}
-                      alt={product.name}
-                      className="w-full h-full object-cover rounded-lg"
-                    />
+                    <div className="relative w-full h-full">
+                      <Image
+                        src={product.imageUrl}
+                        alt={product.name}
+                        fill
+                        className="object-cover rounded-lg"
+                      />
+                    </div>
                   ) : (
                     <div className="text-8xl">{getProductEmoji(product.category)}</div>
                   )}

@@ -16,6 +16,7 @@ import {
 } from '@ecommerce/shared';
 import { useAuth } from '@/contexts/AuthContext';
 import { showToast } from '@/lib/toast';
+import Image from 'next/image';
 
 export default function NewProductPage() {
   const router = useRouter();
@@ -198,11 +199,15 @@ export default function NewProductPage() {
                 {/* Image Preview */}
                 <div className="h-64 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden border-2 border-dashed border-gray-300">
                   {imagePreview ? (
-                    <img
-                      src={imagePreview}
-                      alt="Preview"
-                      className="w-full h-full object-cover"
-                    />
+                    <div className="relative w-full h-full">
+                      <Image
+                        src={imagePreview}
+                        alt="Preview"
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    </div>
                   ) : (
                     <div className="text-center">
                       <div className="text-8xl mb-2">📦</div>
@@ -519,11 +524,15 @@ export default function NewProductPage() {
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
                 <div className="h-40 bg-gray-100 rounded-lg flex items-center justify-center mb-3 overflow-hidden">
                   {imagePreview ? (
-                    <img
-                      src={imagePreview}
-                      alt="Preview"
-                      className="w-full h-full object-cover"
-                    />
+                    <div className="relative w-full h-full">
+                      <Image
+                        src={imagePreview}
+                        alt="Preview"
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    </div>
                   ) : (
                     <div className="text-6xl">📦</div>
                   )}

@@ -27,29 +27,29 @@ export default function StockMovementsPage({ params }: { params: { id: string } 
   const [filterType, setFilterType] = useState<'all' | StockMovementType>('all');
 
   useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [productData, movementsData, statsData] = await Promise.all([
+          getProductById(params.id),
+          getStockMovementsByProduct(params.id, 100),
+          getProductStockStats(params.id),
+        ]);
+
+        setProduct(productData);
+        setMovements(movementsData);
+        setStats(statsData);
+        
+        console.log('✅ Loaded stock movements:', movementsData.length);
+      } catch (error) {
+        console.error('Error loading stock movements:', error);
+        showToast.error('Failed to load stock movements');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     loadData();
   }, [params.id]);
-
-  const loadData = async () => {
-    try {
-      const [productData, movementsData, statsData] = await Promise.all([
-        getProductById(params.id),
-        getStockMovementsByProduct(params.id, 100),
-        getProductStockStats(params.id),
-      ]);
-
-      setProduct(productData);
-      setMovements(movementsData);
-      setStats(statsData);
-      
-      console.log('✅ Loaded stock movements:', movementsData.length);
-    } catch (error) {
-      console.error('Error loading stock movements:', error);
-      showToast.error('Failed to load stock movements');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const getFilteredMovements = () => {
     if (filterType === 'all') {

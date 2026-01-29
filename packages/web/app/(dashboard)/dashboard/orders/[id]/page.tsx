@@ -1,7 +1,7 @@
 // packages/web/app/(dashboard)/dashboard/orders/[id]/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -62,16 +62,13 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
   const [slotValue, setSlotValue] = useState<'morning' | 'evening' | 'flexible'>('flexible');
   const [savingSlot, setSavingSlot] = useState(false);
 
-  useEffect(() => {
-    loadOrder();
-    loadDeliveryPartners();
-  }, [params.id]);
-
-  const loadOrder = async () => {
+  const loadOrder = useCallback(async () => {
     try {
+      setLoading(true);
+
       const data = await getOrderByIdWithProducts(params.id);
       setOrder(data);
-      setSelectedPartner(data.deliveryPartnerId || '');
+      setSelectedPartner(data?.deliveryPartnerId || '');
 
       // Load customer details
       if (data) {
@@ -86,14 +83,18 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
     } finally {
       setLoading(false);
     }
-  };
+  }, [params.id]);
 
-  const loadDeliveryPartners = async () => {
+  const loadDeliveryPartners = useCallback(async () => {
     setLoadingPartners(true);
     try {
       const partners = await getUsersByRole(UserRole.DELIVERY_PARTNER);
+
       // Filter only active delivery partners
-      const activePartners = partners.filter(partner => partner.isActive !== false);
+      const activePartners = partners.filter(
+        partner => partner.isActive !== false
+      );
+
       setDeliveryPartners(activePartners);
       console.log('✅ Loaded delivery partners:', activePartners);
     } catch (error) {
@@ -102,7 +103,12 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
     } finally {
       setLoadingPartners(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadOrder();
+    loadDeliveryPartners();
+  }, [loadOrder, loadDeliveryPartners]);
 
   const handleStatusUpdate = async (newStatus: OrderStatus) => {
     if (!order) return;

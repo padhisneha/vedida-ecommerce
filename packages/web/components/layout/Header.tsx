@@ -1,7 +1,7 @@
 'use client';
 
 import { useAuth } from '@/contexts/AuthContext';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { getUnreadCount, getAllNotifications, markAsRead, markAllAsRead } from '@ecommerce/shared';
 import MobileSidebar from './MobileSidebar';
 import DeliveryMobileSidebar from './DeliveryMobileSidebar';
@@ -19,31 +19,36 @@ export default function Header() {
   const isDeliveryPartner = user?.role === UserRole.DELIVERY_PARTNER;
   const roleLabel = isDeliveryPartner ? 'Delivery Partner' : 'Administrator';
 
-  useEffect(() => {
-    if (user) {
-      loadNotifications();
-      
-      // Poll for new notifications every 30 seconds
-      const interval = setInterval(loadNotifications, 30000);
-      return () => clearInterval(interval);
-    }
-  }, [user]);
-
-  const loadNotifications = async () => {
+  const loadNotifications = useCallback(async () => {
     if (!user) return;
-    
+
     try {
       const [count, notifs] = await Promise.all([
         getUnreadCount(user.id),
         getAllNotifications(user.id, 10),
       ]);
-      
+
       setUnreadCount(count);
       setNotifications(notifs);
     } catch (error) {
       console.error('Error loading notifications:', error);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    // Initial load
+    loadNotifications();
+
+    // Poll every 30 seconds
+    const interval = setInterval(() => {
+      loadNotifications();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [user, loadNotifications]);
+
 
   const handleMarkAsRead = async (notificationId: string) => {
     try {

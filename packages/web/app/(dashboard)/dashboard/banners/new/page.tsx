@@ -17,6 +17,7 @@ import {
   initialCapital,
 } from '@ecommerce/shared';
 import { showToast } from '@/lib/toast';
+import Image from 'next/image';
 
 export default function NewBannerPage() {
   const router = useRouter();
@@ -270,11 +271,15 @@ export default function NewBannerPage() {
                 <div className="space-y-4">
                   <div className="h-64 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden border-2 border-dashed border-gray-300">
                     {imagePreview ? (
-                      <img
-                        src={imagePreview}
-                        alt="Preview"
-                        className="w-full h-full object-contain"
-                      />
+                      <div className="relative w-full h-full">
+                        <Image
+                          src={imagePreview}
+                          alt="Preview"
+                          fill
+                          className="object-contain"
+                          unoptimized
+                        />
+                      </div>
                     ) : (
                       <div className="text-center">
                         <div className="text-6xl mb-2">🖼️</div>
@@ -338,11 +343,13 @@ export default function NewBannerPage() {
                   </div>
 
                   {imagePreview && (
-                    <div className="h-64 bg-gray-100 rounded-lg overflow-hidden border border-gray-300">
-                      <img
+                    <div className="relative h-64 bg-gray-100 rounded-lg overflow-hidden border border-gray-300">
+                      <Image
                         src={imagePreview}
                         alt="Preview"
-                        className="w-full h-full object-contain"
+                        fill
+                        className="object-contain"
+                        unoptimized
                         onError={() => {
                           showToast.error('Failed to load image from URL');
                           setImagePreview(null);
@@ -530,11 +537,15 @@ export default function NewBannerPage() {
                   formData.position === BannerPosition.HOME_HERO ? 'h-40' : 'h-32'
                 }`}>
                   {imagePreview ? (
-                    <img
-                      src={imagePreview}
-                      alt="Preview"
-                      className="w-full h-full object-cover"
-                    />
+                    <div className="relative w-full h-full">
+                      <Image
+                        src={imagePreview}
+                        alt="Preview"
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    </div>
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-5xl">
                       🖼️

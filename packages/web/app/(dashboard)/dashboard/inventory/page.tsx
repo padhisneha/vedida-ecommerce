@@ -12,6 +12,7 @@ import {
   initialCapital,
 } from '@ecommerce/shared';
 import { showToast } from '@/lib/toast';
+import Image from 'next/image';
 
 export default function InventoryPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -298,11 +299,14 @@ export default function InventoryPage() {
                 {/* Product Image */}
                 <div className="h-48 bg-gray-100 flex items-center justify-center relative">
                   {product.imageUrl ? (
-                    <img
-                      src={product.imageUrl}
-                      alt={product.name}
-                      className="w-full h-full object-cover"
-                    />
+                    <div className="relative w-full h-full">
+                      <Image
+                        src={product.imageUrl}
+                        alt={product.name}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
                   ) : (
                     <div className="text-6xl"> {getProductEmoji(product.category)}</div>
                   )}

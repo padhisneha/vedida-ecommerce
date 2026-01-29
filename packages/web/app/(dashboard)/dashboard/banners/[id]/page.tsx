@@ -22,6 +22,7 @@ import {
   initialCapital,
 } from '@ecommerce/shared';
 import { showToast } from '@/lib/toast';
+import Image from 'next/image';
 
 export default function EditBannerPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -50,38 +51,40 @@ export default function EditBannerPage({ params }: { params: { id: string } }) {
   });
 
   useEffect(() => {
+    const loadBanner = async () => {
+      try {
+        const data = await getBannerById(params.id);
+        if (data) {
+          setBanner(data);
+          setFormData({
+            title: data.title,
+            description: data.description || '',
+            platform: data.platform,
+            position: data.position,
+            actionType: data.actionType,
+            actionValue: data.actionValue || '',
+            actionText: data.actionText || '',
+            displayOrder: data.displayOrder,
+            isActive: data.isActive,
+          });
+          setImageSource(data.imageSource);
+          setImagePreview(data.imageUrl);
+          if (data.imageSource === BannerImageSource.URL) {
+            setExternalImageUrl(data.imageUrl);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading banner:', error);
+        showToast.error('Failed to load banner');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     loadBanner();
   }, [params.id]);
 
-  const loadBanner = async () => {
-    try {
-      const data = await getBannerById(params.id);
-      if (data) {
-        setBanner(data);
-        setFormData({
-          title: data.title,
-          description: data.description || '',
-          platform: data.platform,
-          position: data.position,
-          actionType: data.actionType,
-          actionValue: data.actionValue || '',
-          actionText: data.actionText || '',
-          displayOrder: data.displayOrder,
-          isActive: data.isActive,
-        });
-        setImageSource(data.imageSource);
-        setImagePreview(data.imageUrl);
-        if (data.imageSource === BannerImageSource.URL) {
-          setExternalImageUrl(data.imageUrl);
-        }
-      }
-    } catch (error) {
-      console.error('Error loading banner:', error);
-      showToast.error('Failed to load banner');
-    } finally {
-      setLoading(false);
-    }
-  };
+  
 
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -379,11 +382,15 @@ export default function EditBannerPage({ params }: { params: { id: string } }) {
                 <div className="space-y-4">
                   <div className="h-64 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden border-2 border-dashed border-gray-300">
                     {imagePreview ? (
-                      <img
-                        src={imagePreview}
-                        alt="Preview"
-                        className="w-full h-full object-contain"
-                      />
+                      <div className="relative w-full h-full">
+                        <Image
+                          src={imagePreview}
+                          alt="Preview"
+                          fill
+                          className="object-contain"
+                          unoptimized
+                        />
+                      </div>
                     ) : (
                       <div className="text-center">
                         <div className="text-6xl mb-2">🖼️</div>
@@ -435,11 +442,13 @@ export default function EditBannerPage({ params }: { params: { id: string } }) {
                   </div>
 
                   {imagePreview && (
-                    <div className="h-64 bg-gray-100 rounded-lg overflow-hidden border border-gray-300">
-                      <img
+                    <div className="relative h-64 bg-gray-100 rounded-lg overflow-hidden border border-gray-300">
+                      <Image
                         src={imagePreview}
                         alt="Preview"
-                        className="w-full h-full object-contain"
+                        fill
+                        className="object-contain"
+                        unoptimized
                         onError={() => {
                           showToast.error('Failed to load image from URL');
                           setImagePreview(externalImageUrl);
@@ -633,7 +642,15 @@ export default function EditBannerPage({ params }: { params: { id: string } }) {
                   formData.position === BannerPosition.HOME_HERO ? 'h-40' : 'h-32'
                 }`}>
                   {imagePreview ? (
-                    <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                    <div className="relative w-full h-full">
+                      <Image
+                        src={imagePreview}
+                        alt="Preview"
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    </div>
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-5xl">🖼️</div>
                   )}

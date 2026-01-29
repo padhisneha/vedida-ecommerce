@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -31,39 +31,33 @@ export default function DeliveryNotificationsPage() {
   const { user, isAuthenticated, isLoading, isAdmin } = useAuth();
 
   useEffect(() => {
+    const loadCurrentUser = async () => {
+      try {
+        if (!user || user.role !== 'delivery_partner') {
+          showToast.error('Access denied');
+          router.push('/delivery');
+          return;
+        }
+        setCurrentUserId(user.id);
+      } catch (error) {
+        console.error('Error loading user:', error);
+        showToast.error('Failed to load user');
+      }
+    };
+
     loadCurrentUser();
   }, []);
 
-  useEffect(() => {
-    if (currentUserId) {
-      loadNotifications();
-    }
-  }, [currentUserId, activeFilter]);
-
-  const loadCurrentUser = async () => {
-    try {
-      if (!user || user.role !== 'delivery_partner') {
-        showToast.error('Access denied');
-        router.push('/delivery');
-        return;
-      }
-      setCurrentUserId(user.id);
-    } catch (error) {
-      console.error('Error loading user:', error);
-      showToast.error('Failed to load user');
-    }
-  };
-
-  const loadNotifications = async () => {
+  const loadNotifications = useCallback(async () => {
     if (!currentUserId) return;
-    
+
     setLoading(true);
     try {
       const [notifs, count] = await Promise.all([
         getAllNotifications(currentUserId, 100),
         getUnreadCount(currentUserId),
       ]);
-      
+
       setNotifications(notifs);
       setUnreadCount(count);
       console.log('✅ Loaded notifications:', notifs.length);
@@ -73,7 +67,13 @@ export default function DeliveryNotificationsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentUserId]);
+
+  useEffect(() => {
+    if (currentUserId) {
+      loadNotifications();
+    }
+  }, [currentUserId, activeFilter, loadNotifications]);
 
   const handleMarkAsRead = async (notificationId: string) => {
     try {

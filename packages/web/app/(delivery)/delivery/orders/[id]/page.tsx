@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -32,13 +32,8 @@ export default function DeliveryOrderDetailPage({ params }: { params: { id: stri
 
   const { user, isAuthenticated, isLoading, isAdmin } = useAuth();
 
-  useEffect(() => {
-    loadCurrentUserAndOrder();
-  }, [params.id]);
-
-  const loadCurrentUserAndOrder = async () => {
+  const loadCurrentUserAndOrder = useCallback(async () => {
     try {
-
       if (!user || user.role !== UserRole.DELIVERY_PARTNER) {
         showToast.error('Access denied');
         router.push('/delivery');
@@ -47,14 +42,14 @@ export default function DeliveryOrderDetailPage({ params }: { params: { id: stri
 
       // Load order
       const data = await getOrderByIdWithProducts(params.id);
-      
+
       // Check if order is assigned to this delivery partner
       if (data && data.deliveryPartnerId !== user.id) {
         showToast.error('This order is not assigned to you');
         router.push('/delivery');
         return;
       }
-      
+
       setOrder(data);
       console.log('✅ Loaded order:', data);
 
@@ -63,7 +58,6 @@ export default function DeliveryOrderDetailPage({ params }: { params: { id: stri
         const customerData = await getUserById(data.userId);
         setCustomer(customerData || null);
       }
-
     } catch (error) {
       console.error('Error loading order:', error);
       showToast.error('Failed to load order details');
@@ -71,7 +65,11 @@ export default function DeliveryOrderDetailPage({ params }: { params: { id: stri
     } finally {
       setLoading(false);
     }
-  };
+  }, [params.id, user, router]);
+
+  useEffect(() => {
+    loadCurrentUserAndOrder();
+  }, [loadCurrentUserAndOrder]);
 
   const handleStatusUpdate = async (newStatus: OrderStatus) => {
     if (!order) return;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -31,37 +31,26 @@ export default function DeliveryPartnerHomePage() {
 
 
   const { user, isAuthenticated, isLoading, isAdmin } = useAuth();
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-        router.push('/login');
-    } else if (!isLoading && user && user.role !== UserRole.DELIVERY_PARTNER) {
-        if (user && user.role === UserRole.ADMIN) {
-            router.push('/dashboard');
-        } else {
-            showToast.error('Access denied. Admin privileges required.');
-            router.push('/login');
-        }
-    }
-    loadOrders();
-  }, [user, isAuthenticated, isLoading, isAdmin, router]);
 
-  const loadOrders = async () => {
+  const loadOrders = useCallback(async () => {
     if (!user) return;
-    
+
     setLoading(true);
     try {
-      const allOrders = await getAllOrdersWithProducts(); //getAllOrders();
-      
+      const allOrders = await getAllOrdersWithProducts();
+
       // Filter orders assigned to this delivery partner
       const myOrders = allOrders.filter(
         order => order.deliveryPartnerId === user.id
       );
-      
+
       // Sort by scheduled delivery date (earliest first)
-      myOrders.sort((a, b) => 
-        a.scheduledDeliveryDate.toMillis() - b.scheduledDeliveryDate.toMillis()
+      myOrders.sort(
+        (a, b) =>
+          a.scheduledDeliveryDate.toMillis() -
+          b.scheduledDeliveryDate.toMillis()
       );
-      
+
       setOrders(myOrders);
       console.log('✅ Loaded assigned orders:', myOrders.length);
     } catch (error) {
@@ -70,7 +59,27 @@ export default function DeliveryPartnerHomePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push('/login');
+      return;
+    }
+
+    if (!isLoading && user && user.role !== UserRole.DELIVERY_PARTNER) {
+      if (user.role === UserRole.ADMIN) {
+        router.push('/dashboard');
+      } else {
+        showToast.error('Access denied. Admin privileges required.');
+        router.push('/login');
+      }
+      return;
+    }
+
+    loadOrders();
+  }, [isLoading, isAuthenticated, user, router, loadOrders]);
+
 
   const handleStatusUpdate = async (orderId: string, newStatus: OrderStatus) => {
     const statusLabels = {

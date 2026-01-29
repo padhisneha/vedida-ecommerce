@@ -30,40 +30,40 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const loadCustomerData = async () => {
+      try {
+        // Load customer details
+        const customerData = await getUserById(params.id);
+        setCustomer(customerData);
+
+        if (!customerData) {
+          setLoading(false);
+          return;
+        }
+
+        // Load orders
+        const ordersData = await getUserOrdersWithProducts(params.id);
+        setOrders(ordersData);
+
+        // Load subscriptions
+        const subsData = await getUserSubscriptionsWithProducts(params.id);
+        setSubscriptions(subsData);
+
+        // Load stats
+        const statsData = await getCustomerStats(params.id);
+        setStats(statsData);
+
+        console.log('✅ Loaded customer data');
+      } catch (error) {
+        console.error('Error loading customer data:', error);
+        showToast.error('Failed to load customer details');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     loadCustomerData();
   }, [params.id]);
-
-  const loadCustomerData = async () => {
-    try {
-      // Load customer details
-      const customerData = await getUserById(params.id);
-      setCustomer(customerData);
-
-      if (!customerData) {
-        setLoading(false);
-        return;
-      }
-
-      // Load orders
-      const ordersData = await getUserOrdersWithProducts(params.id);
-      setOrders(ordersData);
-
-      // Load subscriptions
-      const subsData = await getUserSubscriptionsWithProducts(params.id);
-      setSubscriptions(subsData);
-
-      // Load stats
-      const statsData = await getCustomerStats(params.id);
-      setStats(statsData);
-
-      console.log('✅ Loaded customer data');
-    } catch (error) {
-      console.error('Error loading customer data:', error);
-      showToast.error('Failed to load customer details');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const getActiveOrders = () => {
     return orders.filter(

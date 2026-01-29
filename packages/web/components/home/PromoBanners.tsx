@@ -12,6 +12,7 @@ import {
   BannerPosition,
   BannerActionType,
 } from '@ecommerce/shared';
+import Image from 'next/image';
 
 export default function PromoBanners() {
   const router = useRouter();
@@ -117,11 +118,13 @@ export default function PromoBanners() {
           onClick={() => handleBannerClick(banner)}
         >
           {/* Banner Image */}
-          <div className="relative h-64 overflow-hidden">
-            <img
+          <div className="relative h-64 overflow-hidden group">
+            <Image
               src={banner.imageUrl}
               alt={banner.title}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              fill
+              className="object-cover group-hover:scale-105 transition-transform duration-300"
+              priority
             />
             
             {/* Gradient Overlay */}

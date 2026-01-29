@@ -287,6 +287,7 @@ export const InvoicePDF: React.FC<InvoicePDFProps> = ({ order, subscription, tax
           <Image 
             style={styles.logo}
             src="/logo.png"
+            alt="Vedida Farms Logo"
           />
         </View>
       </View>

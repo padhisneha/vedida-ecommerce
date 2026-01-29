@@ -431,11 +431,14 @@ export default function HomePage() {
                             <div className="absolute inset-0 bg-green-600 opacity-0 group-hover:opacity-10 transition-opacity duration-300"></div>
                             
                             {displayProduct.imageUrl ? (
-                                <img
-                                src={displayProduct.imageUrl}
-                                alt={displayProduct.name}
-                                className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-300"
-                                />
+                                <div className="relative w-full h-full overflow-hidden">
+                                  <Image
+                                    src={displayProduct.imageUrl}
+                                    alt={displayProduct.name}
+                                    fill
+                                    className="object-cover transform group-hover:scale-110 transition-transform duration-300"
+                                  />
+                                </div>
                             ) : (
                                 <span className="text-8xl transform group-hover:scale-110 transition-transform duration-300">
                                 {displayProduct.emoji}
