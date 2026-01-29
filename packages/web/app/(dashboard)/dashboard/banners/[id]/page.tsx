@@ -147,7 +147,7 @@ export default function EditBannerPage({ params }: { params: { id: string } }) {
 
         // Handle image updates
         if (imageSource === BannerImageSource.UPLOAD && imageFile) {
-            showToast.loading('Uploading new image...', { id: toastId });
+            const toastId = showToast.loading('Uploading new image...');
 
             // Delete old image if it was uploaded (not external URL)
             if (banner.imageSource === BannerImageSource.UPLOAD && banner.imageUrl) {
@@ -178,7 +178,7 @@ export default function EditBannerPage({ params }: { params: { id: string } }) {
             finalImageSource = BannerImageSource.URL;
         }
 
-        showToast.loading('Updating banner...', { id: toastId });
+        const toastId = showToast.loading('Updating banner...');
 
         // Build update data, excluding undefined values
         const updateData: any = {

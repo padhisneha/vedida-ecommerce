@@ -111,11 +111,11 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
         // Upload image if new image is selected
         let imageUrl = product.imageUrl;
         if (imageFile) {
-        showToast.loading('Uploading image...', { id: toastId });
-        const uploadedUrl = await handleImageUpload();
-        if (uploadedUrl) {
-            imageUrl = uploadedUrl;
-        }
+          const toastId = showToast.loading('Uploading image...');
+          const uploadedUrl = await handleImageUpload();
+          if (uploadedUrl) {
+              imageUrl = uploadedUrl;
+          }
         }
 
         const updateData: any = {
@@ -127,7 +127,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
         updateData.imageUrl = imageUrl;
         }
 
-        showToast.loading('Updating product details...', { id: toastId });
+        const toastId = showToast.loading('Updating product details...');
         await updateProduct(product.id, updateData);
 
         showToast.dismiss(toastId);
