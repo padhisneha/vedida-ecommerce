@@ -33,7 +33,7 @@ export default function Sidebar() {
       <div className="flex flex-col w-64">
         <div className="flex flex-col h-screen bg-white border-r border-gray-200">
           {/* Logo */}
-          <div align="center"><Image src="/logo.png" width="120" height="120" className="object-cover" alt="Logo" /></div>
+          <div className="flex justify-center"><Image src="/logo.png" width="120" height="120" className="object-cover" alt="Logo" /></div>
           <div className="flex items-center h-16 flex-shrink-0 px-6 border-b border-gray-200">
             {/* <div className="text-2xl mr-2"><Image src="/logo.png" width="80" height="80" className="object-cover" alt="Logo" /> </div> */}
             <div>
