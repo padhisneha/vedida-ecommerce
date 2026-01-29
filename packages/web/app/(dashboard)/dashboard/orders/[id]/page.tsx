@@ -317,7 +317,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
     try {
       // Update both method and status
       await updatePaymentMethod(order.id, paymentMethodValue);
-      await updatePaymentStatus(order.id, paymentStatusValue);
+      await updatePaymentStatus(order.id, paymentStatusValue as 'pending' | 'paid' | 'failed');
 
       showToast.dismiss(toastId);
       showToast.success('Payment information updated successfully!');

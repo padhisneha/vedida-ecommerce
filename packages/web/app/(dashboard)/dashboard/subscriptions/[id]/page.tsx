@@ -209,7 +209,7 @@ export default function SubscriptionDetailPage({ params }: { params: { id: strin
     try {
         // Update both method and status
         await updateSubscriptionPaymentMethod(subscription.id, paymentMethodValue);
-        await updateSubscriptionPaymentStatus(subscription.id, paymentStatusValue);
+        await updateSubscriptionPaymentStatus(subscription.id, paymentStatusValue as 'pending' | 'paid' | 'failed');
 
         showToast.dismiss(toastId);
         showToast.success('Payment information updated successfully!');
