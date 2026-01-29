@@ -210,12 +210,12 @@ export default function DeliveryOrderDetailPage({ params }: { params: { id: stri
   const getNextStatusLabel = (currentStatus: OrderStatus): string => {
     const next = getNextStatus(currentStatus);
     if (!next) return '';
-    const labels = {
+    const labels: Partial<Record<OrderStatus, string>> = {
       [OrderStatus.CONFIRMED]: 'Confirm Order',
       [OrderStatus.OUT_FOR_DELIVERY]: 'Mark Out for Delivery',
       [OrderStatus.DELIVERED]: 'Mark as Delivered',
     };
-    return labels[next] || '';
+    return labels[next] ?? '';
   };
 
   if (loading) {

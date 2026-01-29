@@ -425,7 +425,7 @@ export default function DashboardPage() {
                   <span className="font-medium text-gray-900">{item.name}</span>
                 </div>
                 <span className="text-lg font-bold text-primary-600">
-                  {item.quantity} x {item.productQuantity} {item.productUnit}
+                  {item.quantity} x {item.productQuantity.toString()} {item.productUnit}
                 </span>
               </div>
             ))}

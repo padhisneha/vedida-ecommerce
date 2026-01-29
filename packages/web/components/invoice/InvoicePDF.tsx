@@ -384,7 +384,7 @@ export const InvoicePDF: React.FC<InvoicePDFProps> = ({ order, subscription, tax
         {/* Table Rows */}
         {items.map((item, index) => {
           const itemData = isOrder 
-            ? { name: item.product?.name || 'Product', qty: item.quantity, price: item.price }
+            ? { name: item.product?.name || 'Product', qty: item.quantity, price: item.product?.price || 0 }
             : { name: item.product?.name || 'Product', qty: item.quantity, price: item.product?.price || 0 };
           
           return (

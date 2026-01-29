@@ -54,7 +54,7 @@ export default function SubscriptionDetailPage({ params }: { params: { id: strin
 
       const data = await getSubscriptionWithProducts(params.id);
       setSubscription(data);
-      setSelectedPartner(data.deliveryPartnerId || '');
+      setSelectedPartner(data?.deliveryPartnerId || '');
 
       // Load customer details
       if (data) {
@@ -100,6 +100,7 @@ export default function SubscriptionDetailPage({ params }: { params: { id: strin
     if (!subscription) return;
 
     const statusLabels = {
+      [SubscriptionStatus.PENDING]: 'Pending',
       [SubscriptionStatus.ACTIVE]: 'Active',
       [SubscriptionStatus.PAUSED]: 'Paused',
       [SubscriptionStatus.COMPLETED]: 'Completed',

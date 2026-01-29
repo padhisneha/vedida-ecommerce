@@ -248,12 +248,12 @@ export default function DeliveryPartnerHomePage() {
   const getNextStatusLabel = (currentStatus: OrderStatus): string => {
     const next = getNextStatus(currentStatus);
     if (!next) return '';
-    const labels = {
+    const labels: Partial<Record<OrderStatus, string>> = {
       [OrderStatus.CONFIRMED]: 'Confirm',
       [OrderStatus.OUT_FOR_DELIVERY]: 'Out for Delivery',
       [OrderStatus.DELIVERED]: 'Mark Delivered',
     };
-    return labels[next] || '';
+    return labels[next] ?? '';
   };
 
   if (loading) {

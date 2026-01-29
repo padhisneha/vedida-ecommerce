@@ -196,8 +196,9 @@ const serviceAreas = [
 
 export default function HomePage() {
 
-  const [offers, setOffers] = useState<Offer[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [offers, setOffers] = useState<(Offer | any)[]>([]);
+  const [products, setProducts] = useState<(Product | any)[]>([]);
+
   const [loadingOffers, setLoadingOffers] = useState(true);
   const [loadingProducts, setLoadingProducts] = useState(true);
 
@@ -272,14 +273,27 @@ export default function HomePage() {
 
   // Helper to format product for display
   const formatProductForDisplay = (product: any) => {
+    // Check if it's a full Product type with category
+    if ('category' in product && product.category) {
+      return {
+          id: product.id,
+          name: product.name || 'Product',
+          description: product.description || `Fresh ${product.name || 'dairy product'}`,
+          price: product.price || 0,
+          unit: `${product.quantity || ''} ${product.unit || ''}`.trim() || 'unit',
+          emoji: getProductEmoji(product.category),
+          imageUrl: product.imageUrl,
+      };
+    }
+    // It's a mock product
     return {
         id: product.id,
         name: product.name || 'Product',
         description: product.description || `Fresh ${product.name || 'dairy product'}`,
         price: product.price || 0,
-        unit: product.unit ? `${product.quantity || ''} ${product.unit}`.trim() : 'unit',
-        emoji: getProductEmoji(product.category),
-        imageUrl: product.imageUrl,
+        unit: product.unit || 'unit',
+        emoji: product.emoji || '📦',
+        imageUrl: product.image,
     };
   };
 
