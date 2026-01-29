@@ -141,7 +141,7 @@ export default function NewProductPage() {
 
       // Upload image if selected
       if (imageFile) {
-        showToast.loading('Uploading product image...');
+        const toastId = showToast.loading('Uploading product image...');
         
         try {
           const path = generateProductImagePath(productId, imageFile.name);

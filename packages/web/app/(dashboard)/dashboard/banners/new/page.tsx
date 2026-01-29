@@ -120,7 +120,7 @@ export default function NewBannerPage() {
         let finalImageUrl = '';
 
         if (imageSource === BannerImageSource.UPLOAD && imageFile) {
-        showToast.loading('Uploading image...', { id: toastId });
+        const toastId = showToast.loading('Uploading image...');
         const tempId = `temp_${Date.now()}`;
         const path = generateBannerImagePath(tempId, imageFile.name);
         finalImageUrl = await uploadBannerImage(imageFile, path);
@@ -128,7 +128,7 @@ export default function NewBannerPage() {
         finalImageUrl = externalImageUrl.trim();
         }
 
-        showToast.loading('Creating banner...', { id: toastId });
+        const toastId = showToast.loading('Creating banner...');
         
         // Build banner data, excluding undefined/empty values
         const bannerData: any = {
