@@ -29,6 +29,8 @@ import {
   UPI_CONFIG,
   PaymentStatus,
   updateOrderDeliverySlot,
+  DeliverySlot,
+  PaymentMethod,
 } from '@ecommerce/shared';
 import { showToast } from '@/lib/toast';
 import { generateOrderInvoicePDF } from '@/lib/invoice-generator';
@@ -54,12 +56,12 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
   const [savingDate, setSavingDate] = useState(false);
 
   const [editingPayment, setEditingPayment] = useState(false);
-  const [paymentMethodValue, setPaymentMethodValue] = useState<'cod' | 'online' | 'upi'>('cod');
-  const [paymentStatusValue, setPaymentStatusValue] = useState<'pending' | 'paid' | 'failed'>('pending');
+  const [paymentMethodValue, setPaymentMethodValue] = useState<PaymentMethod>(PaymentMethod.COD);
+  const [paymentStatusValue, setPaymentStatusValue] = useState<PaymentStatus>(PaymentStatus.PENDING);
   const [savingPayment, setSavingPayment] = useState(false);
 
   const [editingSlot, setEditingSlot] = useState(false);
-  const [slotValue, setSlotValue] = useState<'morning' | 'evening' | 'flexible'>('flexible');
+  const [slotValue, setSlotValue] = useState<DeliverySlot>(DeliverySlot.FLEXIBLE);
   const [savingSlot, setSavingSlot] = useState(false);
 
   const loadOrder = useCallback(async () => {
@@ -392,31 +394,31 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
     return vehicleType ? icons[vehicleType] || '🚚' : '🚚';
   };
 
-  const getPaymentMethodLabel = (method?: string) => {
+  const getPaymentMethodLabel = (method?: PaymentMethod) => {
     const labels: Record<string, string> = {
-      cod: '💵 Cash on Delivery',
-      online: '💳 Online Payment',
-      upi: '🔳 UPI Payment',
+      [PaymentMethod.COD]: '💵 Cash on Delivery',
+      [PaymentMethod.ONLINE]: '💳 Online Payment',
+      [PaymentMethod.UPI]: '🔳 UPI Payment',
     };
-    return labels[method || 'cod'] || '💵 Cash on Delivery';
+    return labels[method || PaymentMethod.COD] || '💵 Cash on Delivery';
   };
 
-  const getPaymentStatusBadge = (status?: string) => {
+  const getPaymentStatusBadge = (status?: PaymentStatus) => {
     const styles: Record<string, string> = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      pending_verification: 'bg-yellow-100 text-yellow-800',
-      paid: 'bg-green-100 text-green-800',
-      failed: 'bg-red-100 text-red-800',
+      [PaymentStatus.PENDING]: 'bg-yellow-100 text-yellow-800',
+      [PaymentStatus.PENDING_VERIFICATION]: 'bg-yellow-100 text-yellow-800',
+      [PaymentStatus.PAID]: 'bg-green-100 text-green-800',
+      [PaymentStatus.FAILED]: 'bg-red-100 text-red-800',
     };
     
     const labels: Record<string, string> = {
-      pending: '⏳ Pending',
-      pending_verification: '⏳ Pending Verification',
-      paid: '✅ Paid',
-      failed: '❌ Failed',
+      [PaymentStatus.PENDING]: '⏳ Pending',
+      [PaymentStatus.PENDING_VERIFICATION]: '⏳ Pending Verification',
+      [PaymentStatus.PAID]: '✅ Paid',
+      [PaymentStatus.FAILED]: '❌ Failed',
     };
     
-    const statusKey = status || 'pending';
+    const statusKey = status || PaymentStatus.PENDING;
     return (
       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${styles[statusKey]}`}>
         {labels[statusKey]}
@@ -786,7 +788,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                     <button
                       onClick={() => {
                         setEditingSlot(true);
-                        setSlotValue(order.deliverySlot || 'flexible');
+                        setSlotValue(order.deliverySlot || DeliverySlot.FLEXIBLE);
                       }}
                       className="text-xs text-primary-600 hover:text-primary-700 font-medium"
                     >
@@ -800,12 +802,12 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                     <select
                       className="input text-sm mb-2"
                       value={slotValue}
-                      onChange={(e) => setSlotValue(e.target.value as 'morning' | 'evening' | 'flexible')}
+                      onChange={(e) => setSlotValue(e.target.value as DeliverySlot)}
                       disabled={savingSlot}
                     >
-                      <option value="morning">🌅 Morning (6 AM - 12 PM)</option>
-                      <option value="evening">🌆 Evening (4 PM - 8 PM)</option>
-                      <option value="flexible">🕐 Flexible (Any Time)</option>
+                      <option value={DeliverySlot.MORNING}>🌅 Morning (6 AM - 12 PM)</option>
+                      <option value={DeliverySlot.EVENING}>🌆 Evening (4 PM - 8 PM)</option>
+                      <option value={DeliverySlot.FLEXIBLE}>🕐 Flexible (Any Time)</option>
                     </select>
                     
                     <div className="flex gap-2">
@@ -819,7 +821,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                       <button
                         onClick={() => {
                           setEditingSlot(false);
-                          setSlotValue(order.deliverySlot || 'flexible');
+                          setSlotValue(order.deliverySlot || DeliverySlot.FLEXIBLE);
                         }}
                         disabled={savingSlot}
                         className="text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
@@ -832,12 +834,12 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                   <div>
                     <p className="font-semibold text-gray-900 flex items-center gap-2">
                       <span className="text-xl">
-                        {order.deliverySlot === 'morning' ? '🌅' : 
-                        order.deliverySlot === 'evening' ? '🌆' : '🕐'}
+                        {order.deliverySlot === DeliverySlot.MORNING ? '🌅' : 
+                        order.deliverySlot === DeliverySlot.EVENING ? '🌆' : '🕐'}
                       </span>
                       <span>{order.deliverySlotLabel || 'Flexible Delivery'}</span>
                     </p>
-                    {order.deliverySlot === 'flexible' && (
+                    {order.deliverySlot === DeliverySlot.FLEXIBLE && (
                       <p className="text-xs text-gray-500 mt-1">
                         Team will coordinate delivery time
                       </p>
@@ -933,23 +935,23 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                     <select
                       className="input text-sm mb-2"
                       value={paymentMethodValue}
-                      onChange={(e) => setPaymentMethodValue(e.target.value as 'cod' | 'online' | 'upi')}
+                      onChange={(e) => setPaymentMethodValue(e.target.value as PaymentMethod)}
                       disabled={savingPayment}
                     >
-                      <option value="cod">💵 Cash on Delivery</option>
-                      <option value="online">💳 Online Payment</option>
-                      <option value="upi">🔳 UPI Payment</option>
+                      <option value={PaymentMethod.COD}>💵 Cash on Delivery</option>
+                      <option value={PaymentMethod.ONLINE}>💳 Online Payment</option>
+                      <option value={PaymentMethod.UPI}>🔳 UPI Payment</option>
                     </select>
                     
                     <select
                       className="input text-sm mb-2"
                       value={paymentStatusValue}
-                      onChange={(e) => setPaymentStatusValue(e.target.value as 'pending' | 'paid' | 'failed')}
+                      onChange={(e) => setPaymentStatusValue(e.target.value as PaymentStatus)}
                       disabled={savingPayment}
                     >
-                      <option value="pending">⏳ Pending</option>
-                      <option value="paid">✅ Paid</option>
-                      <option value="failed">❌ Failed</option>
+                      <option value={PaymentStatus.PENDING}>⏳ Pending</option>
+                      <option value={PaymentStatus.PAID}>✅ Paid</option>
+                      <option value={PaymentStatus.FAILED}>❌ Failed</option>
                     </select>
                     
                     <div className="flex gap-2">
@@ -963,7 +965,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                       <button
                         onClick={() => {
                           setEditingPayment(false);
-                          setPaymentMethodValue(order.paymentMethod || 'cod');
+                          setPaymentMethodValue(order.paymentMethod || PaymentMethod.COD);
                           setPaymentStatusValue(order.paymentStatus || PaymentStatus.PENDING);
                         }}
                         disabled={savingPayment}
@@ -979,7 +981,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                       {getPaymentMethodLabel(order.paymentMethod)}
                     </p>
 
-                    {order.paymentMethod === 'upi' && order.transactionId && (
+                    {order.paymentMethod === PaymentMethod.UPI && order.transactionId && (
                       <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
                         <p className="text-sm text-yellow-800 mb-1">UPI Transaction Reference</p>
                         <p className="font-mono font-semibold text-yellow-900">{order.transactionId}</p>
@@ -1063,7 +1065,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
           )}
 
           {/* UPI Payment Verification - Show for pending_verification */}
-          {order.paymentStatus === 'pending_verification' && (
+          {order.paymentStatus === PaymentStatus.PENDING_VERIFICATION && (
             <div className="card bg-yellow-50 border-2 border-yellow-400">
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-3xl">⏳</span>

@@ -21,6 +21,9 @@ import {
   formatDate,
   formatDateTime,
   updateSubscriptionDeliverySlot,
+  DeliverySlot,
+  PaymentMethod,
+  PaymentStatus,
 } from '@ecommerce/shared';
 import { showToast } from '@/lib/toast';
 import { generateSubscriptionInvoicePDF } from '@/lib/invoice-generator';
@@ -37,12 +40,12 @@ export default function SubscriptionDetailPage({ params }: { params: { id: strin
   const [customer, setCustomer] = useState<User | null>(null);
 
   const [editingPayment, setEditingPayment] = useState(false);
-  const [paymentMethodValue, setPaymentMethodValue] = useState<'cod' | 'online' | 'upi'>('cod');
-  const [paymentStatusValue, setPaymentStatusValue] = useState<'pending' | 'paid' | 'failed'>('pending');
+  const [paymentMethodValue, setPaymentMethodValue] = useState<PaymentMethod>(PaymentMethod.COD);
+  const [paymentStatusValue, setPaymentStatusValue] = useState<PaymentStatus>(PaymentStatus.PENDING);
   const [savingPayment, setSavingPayment] = useState(false);
 
   const [editingSlot, setEditingSlot] = useState(false);
-  const [slotValue, setSlotValue] = useState<'morning' | 'evening'>('morning');
+  const [slotValue, setSlotValue] = useState<DeliverySlot>(DeliverySlot.MORNING);
   const [savingSlot, setSavingSlot] = useState(false);
 
   const loadSubscription = useCallback(async () => {
@@ -265,29 +268,29 @@ export default function SubscriptionDetailPage({ params }: { params: { id: strin
     return vehicleType ? icons[vehicleType] || '🚚' : '🚚';
   };
 
-  const getPaymentMethodLabel = (method?: string) => {
+  const getPaymentMethodLabel = (method?: PaymentMethod) => {
     const labels: Record<string, string> = {
-      cod: '💵 Cash on Delivery',
-      online: '💳 Online Payment',
-      upi: '🔳 UPI Payment',
+      [PaymentMethod.COD]: '💵 Cash on Delivery',
+      [PaymentMethod.ONLINE]: '💳 Online Payment',
+      [PaymentMethod.UPI]: '🔳 UPI Payment',
     };
-    return labels[method || 'cod'] || '💵 Cash on Delivery';
+    return labels[method || PaymentMethod.COD] || '💵 Cash on Delivery';
   };
 
-  const getPaymentStatusBadge = (status?: string) => {
+  const getPaymentStatusBadge = (status?: PaymentStatus) => {
     const styles: Record<string, string> = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      paid: 'bg-green-100 text-green-800',
-      failed: 'bg-red-100 text-red-800',
+      [PaymentStatus.PENDING]: 'bg-yellow-100 text-yellow-800',
+      [PaymentStatus.PAID]: 'bg-green-100 text-green-800',
+      [PaymentStatus.FAILED]: 'bg-red-100 text-red-800',
     };
     
     const labels: Record<string, string> = {
-      pending: '⏳ Pending',
-      paid: '✅ Paid',
-      failed: '❌ Failed',
+      [PaymentStatus.PENDING]: '⏳ Pending',
+      [PaymentStatus.PAID]: '✅ Paid',
+      [PaymentStatus.FAILED]: '❌ Failed',
     };
     
-    const statusKey = status || 'pending';
+    const statusKey = status || PaymentStatus.PENDING;
     return (
       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${styles[statusKey]}`}>
         {labels[statusKey]}
@@ -606,7 +609,7 @@ export default function SubscriptionDetailPage({ params }: { params: { id: strin
                 <button
                   onClick={() => {
                     setEditingSlot(true);
-                    setSlotValue(subscription.deliverySlot || 'morning');
+                    setSlotValue(subscription.deliverySlot || DeliverySlot.MORNING);
                   }}
                   className="text-sm text-primary-600 hover:text-primary-700 font-medium"
                 >
@@ -620,11 +623,11 @@ export default function SubscriptionDetailPage({ params }: { params: { id: strin
                 <select
                   className="input mb-3"
                   value={slotValue}
-                  onChange={(e) => setSlotValue(e.target.value as 'morning' | 'evening')}
+                  onChange={(e) => setSlotValue(e.target.value as DeliverySlot)}
                   disabled={savingSlot}
                 >
-                  <option value="morning">🌅 Morning (6 AM - 12 PM)</option>
-                  <option value="evening">🌆 Evening (4 PM - 8 PM)</option>
+                  <option value={DeliverySlot.MORNING}>🌅 Morning (6 AM - 12 PM)</option>
+                  <option value={DeliverySlot.EVENING}>🌆 Evening (4 PM - 8 PM)</option>
                 </select>
                 
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
@@ -645,7 +648,7 @@ export default function SubscriptionDetailPage({ params }: { params: { id: strin
                   <button
                     onClick={() => {
                       setEditingSlot(false);
-                      setSlotValue(subscription.deliverySlot || 'morning');
+                      setSlotValue(subscription.deliverySlot || DeliverySlot.MORNING);
                     }}
                     disabled={savingSlot}
                     className="btn-secondary"
@@ -658,7 +661,7 @@ export default function SubscriptionDetailPage({ params }: { params: { id: strin
               <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-lg border-2 border-green-200">
                 <div className="flex items-center gap-3">
                   <span className="text-4xl">
-                    {subscription.deliverySlot === 'morning' ? '🌅' : '🌆'}
+                    {subscription.deliverySlot === DeliverySlot.MORNING ? '🌅' : '🌆'}
                   </span>
                   <div>
                     <p className="font-semibold text-gray-900 text-lg">
@@ -959,23 +962,23 @@ export default function SubscriptionDetailPage({ params }: { params: { id: strin
                     <select
                         className="input text-sm mb-2"
                         value={paymentMethodValue}
-                        onChange={(e) => setPaymentMethodValue(e.target.value as 'cod' | 'online' | 'upi')}
+                        onChange={(e) => setPaymentMethodValue(e.target.value as PaymentMethod)}
                         disabled={savingPayment}
                     >
-                        <option value="cod">💵 Cash on Delivery</option>
-                        <option value="online">💳 Online Payment</option>
-                        <option value="upi">🔳 UPI Payment</option>
+                        <option value={PaymentMethod.COD}>💵 Cash on Delivery</option>
+                        <option value={PaymentMethod.ONLINE}>💳 Online Payment</option>
+                        <option value={PaymentMethod.UPI}>🔳 UPI Payment</option>
                     </select>
                     
                     <select
                         className="input text-sm mb-2"
                         value={paymentStatusValue}
-                        onChange={(e) => setPaymentStatusValue(e.target.value as 'pending' | 'paid' | 'failed')}
+                        onChange={(e) => setPaymentStatusValue(e.target.value as PaymentStatus)}
                         disabled={savingPayment}
                     >
-                        <option value="pending">⏳ Pending</option>
-                        <option value="paid">✅ Paid</option>
-                        <option value="failed">❌ Failed</option>
+                        <option value={PaymentStatus.PENDING}>⏳ Pending</option>
+                        <option value={PaymentStatus.PAID}>✅ Paid</option>
+                        <option value={PaymentStatus.FAILED}>❌ Failed</option>
                     </select>
                     
                     <div className="flex gap-2">
@@ -989,8 +992,8 @@ export default function SubscriptionDetailPage({ params }: { params: { id: strin
                         <button
                         onClick={() => {
                             setEditingPayment(false);
-                            setPaymentMethodValue(subscription.paymentMethod || 'cod');
-                            setPaymentStatusValue(subscription.paymentStatus || 'pending');
+                            setPaymentMethodValue(subscription.paymentMethod || PaymentMethod.COD);
+                            setPaymentStatusValue(subscription.paymentStatus || PaymentStatus.PENDING);
                         }}
                         disabled={savingPayment}
                         className="text-xs px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"

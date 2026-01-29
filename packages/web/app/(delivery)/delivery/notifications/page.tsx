@@ -46,7 +46,7 @@ export default function DeliveryNotificationsPage() {
     };
 
     loadCurrentUser();
-  }, []);
+  }, [user, router]);
 
   const loadNotifications = useCallback(async () => {
     if (!currentUserId) return;

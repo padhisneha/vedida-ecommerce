@@ -45,7 +45,7 @@ export default function AdminNotificationsPage() {
     };
 
     loadCurrentUser();
-  }, []);
+  }, [user, router]);
 
 
   const loadNotifications = useCallback(async () => {
